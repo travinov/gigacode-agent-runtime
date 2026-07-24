@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="network" viewBox="0 0 48 48">
+    <path d="M12 12h9v9h-9zM27 7h9v9h-9zM27 30h9v9h-9zM7 29h9v9H7z" fill="none" stroke="currentColor" stroke-width="2"/>
+    <path d="m21 15 6-3m4 4v14m-15 3 11 1M17 21l-4 8" fill="none" stroke="currentColor" stroke-width="2"/>
+  </symbol>
+  <symbol id="pulse" viewBox="0 0 64 64">
+    <circle cx="32" cy="32" r="25" fill="none" stroke="currentColor" stroke-width="2" opacity=".35"/>
+    <path d="M8 34h14l5-13 9 25 6-17 4 5h10" fill="none" stroke="currentColor" stroke-width="3"/>
+  </symbol>
+</svg>
