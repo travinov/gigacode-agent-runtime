@@ -178,10 +178,14 @@ def _verify_release_contract(
         raise ValueError("Unexpected release product")
     if manifest.get("platform") != "macos":
         raise ValueError("Unexpected release platform")
+    if manifest.get("minimum_macos_version") != "10.15":
+        raise ValueError("Release requires macOS 10.15 or newer")
     if manifest.get("architectures") != ["x86_64"]:
         raise ValueError("Release architecture must be x86_64")
     if manifest.get("python_minors") != ["3.11", "3.12", "3.13", "3.14"]:
         raise ValueError("Release must cover Python 3.11 through 3.14")
+    if manifest.get("release_stage") != "release-candidate":
+        raise ValueError("Release manifest must identify a release candidate")
 
     required = {
         "installer/install-macos.sh",
@@ -193,6 +197,8 @@ def _verify_release_contract(
         "README.md",
         "LICENSE",
         "optional-skill/SKILL.md",
+        "docs/corporate-acceptance-checklist.md",
+        "docs/release-checklist.md",
         "requirements/runtime-py311.lock",
         "requirements/runtime-py312.lock",
         "requirements/runtime-py313.lock",

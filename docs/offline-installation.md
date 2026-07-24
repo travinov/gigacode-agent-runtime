@@ -1,8 +1,8 @@
 # Офлайн-установка на macOS
 
-V1 поддерживает корпоративный Mac `x86_64` с Python 3.11–3.14. Установка не
-обращается к PyPI: ZIP содержит wheel runtime, совместимый wheelhouse,
-документацию, примеры и installer scripts.
+V1 поддерживает корпоративный Mac с macOS 10.15+, архитектурой `x86_64` и
+Python 3.11–3.14. Установка не обращается к PyPI: ZIP содержит wheel runtime,
+совместимый wheelhouse, документацию, примеры и installer scripts.
 
 ## Предварительная проверка
 
@@ -11,6 +11,7 @@ V1 поддерживает корпоративный Mac `x86_64` с Python 3.
 ```bash
 uname -s
 uname -m
+sw_vers -productVersion
 python3 --version
 gigacode --version
 gigacode --help

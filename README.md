@@ -11,8 +11,9 @@ Runtime позволяет описать в YAML:
 - ограниченные review/repair loops;
 - разные GigaCode model ID и permission mode для каждого агента.
 
-Версия 1 предназначена для macOS `x86_64` и Python 3.11–3.14. Linux не является
-поддерживаемой платформой v1. Runtime устанавливается офлайн из ZIP.
+Версия 1 предназначена для macOS `x86_64` версии 10.15+ и Python 3.11–3.14.
+Linux не является поддерживаемой платформой v1. Runtime устанавливается офлайн
+из ZIP.
 
 ## Как это работает
 
@@ -89,6 +90,8 @@ agent-runtime dashboard RUN_ID --open
 - [MCP API](docs/mcp-api.md)
 - [Web UI](docs/web-ui.md)
 - [Офлайн-установка](docs/offline-installation.md)
+- [Release checklist](docs/release-checklist.md)
+- [Корпоративный acceptance](docs/corporate-acceptance-checklist.md)
 - [Диагностика и восстановление](docs/troubleshooting.md)
 
 Optional Skill находится в `optional-skill/SKILL.md`. Он объясняет агенту

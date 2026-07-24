@@ -28,6 +28,8 @@ def _minimal_release(tmp_path: Path) -> Path:
         "README.md",
         "LICENSE",
         "optional-skill/SKILL.md",
+        "docs/corporate-acceptance-checklist.md",
+        "docs/release-checklist.md",
         "requirements/runtime-py311.lock",
         "requirements/runtime-py312.lock",
         "requirements/runtime-py313.lock",
@@ -51,8 +53,10 @@ def test_source_release_manifest_and_locks_are_complete() -> None:
     manifest = json.loads((ROOT / "release-manifest.json").read_text())
 
     assert manifest["version"] == "1.0.0"
+    assert manifest["minimum_macos_version"] == "10.15"
     assert manifest["architectures"] == ["x86_64"]
     assert manifest["python_minors"] == ["3.11", "3.12", "3.13", "3.14"]
+    assert manifest["release_stage"] == "release-candidate"
     for minor in ("311", "312", "313", "314"):
         lock = (ROOT / "requirements" / f"runtime-py{minor}.lock").read_text()
         requirements = [

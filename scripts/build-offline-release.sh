@@ -63,6 +63,8 @@ cp "$SCRIPT_DIR/release_tool.py" "$STAGE_ROOT/scripts/release_tool.py"
 cp "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/CHANGELOG.md" \
   "$PROJECT_ROOT/LICENSE" "$STAGE_ROOT/"
 
+find "$STAGE_ROOT" -type f \( -name ".DS_Store" -o -name "*.pyc" \) \
+  -exec /bin/rm -f {} \;
 find "$STAGE_ROOT/installer" "$STAGE_ROOT/scripts" -type f -name "*.sh" \
   -exec chmod 755 {} \;
 chmod 755 "$STAGE_ROOT/scripts/release_tool.py"

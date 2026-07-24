@@ -12,3 +12,5 @@
 - Local stdio MCP server, emergency CLI, and authenticated loopback Web UI.
 - Structured diagnostics and a read-only built-in scenario catalog.
 - Offline macOS x86_64 packaging, verification, and rollback contracts.
+- Release-candidate gates for real stdio MCP, offline dependency resolution,
+  Web monitoring, recovery, and corporate acceptance evidence.
