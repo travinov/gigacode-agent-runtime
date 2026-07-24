@@ -45,15 +45,15 @@ def _read_schema_text(filename: str) -> str:
     if packaged.is_file():
         return packaged.read_text(encoding="utf-8")
 
+    checkout_schema = Path(__file__).resolve().parents[2] / "schemas" / filename
+    if checkout_schema.is_file():
+        return checkout_schema.read_text(encoding="utf-8")
+
     installed_schema = (
         Path(sys.prefix) / "share" / "gigacode-agent-runtime" / "schemas" / filename
     )
     if installed_schema.is_file():
         return installed_schema.read_text(encoding="utf-8")
-
-    checkout_schema = Path(__file__).resolve().parents[2] / "schemas" / filename
-    if checkout_schema.is_file():
-        return checkout_schema.read_text(encoding="utf-8")
 
     raise AgentRuntimeError(
         ErrorCode.SCHEMA_NOT_FOUND,

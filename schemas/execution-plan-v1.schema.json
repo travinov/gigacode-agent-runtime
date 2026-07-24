@@ -10,11 +10,16 @@
     "config_hash",
     "inputs_hash",
     "scenario_name",
+    "scenario_title",
+    "source",
     "workspace",
+    "inputs",
     "max_parallel_agents",
     "agents",
     "steps",
     "waves",
+    "result_reference",
+    "resource_hashes",
     "capability_requirements"
   ],
   "properties": {
@@ -37,9 +42,39 @@
       "type": "string",
       "minLength": 1
     },
+    "scenario_title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "level",
+        "path",
+        "root"
+      ],
+      "properties": {
+        "level": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
     "workspace": {
       "type": "string",
       "minLength": 1
+    },
+    "inputs": {
+      "type": "object"
     },
     "max_parallel_agents": {
       "type": "integer",
@@ -62,6 +97,16 @@
           "type": "string"
         },
         "minItems": 1
+      }
+    },
+    "result_reference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resource_hashes": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/hash"
       }
     },
     "capability_requirements": {

@@ -1,0 +1,108 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from gigacode_agent_runtime.config import load_config
+from gigacode_agent_runtime.domain import LoopStepDefinition
+from gigacode_agent_runtime.errors import AgentRuntimeError, ErrorCode
+from gigacode_agent_runtime.plan_compiler import compile_plan, execution_plan_to_document
+from gigacode_agent_runtime.scenario_loader import load_scenario_file
+from gigacode_agent_runtime.schema_registry import validate_document
+
+FIXTURES = Path(__file__).parents[1] / "fixtures" / "scenarios"
+
+
+def _config(tmp_path: Path):
+    return load_config(tmp_path / "missing-config.yaml", home=tmp_path / "home")
+
+
+def test_sequential_and_parallel_scenarios_compile_to_expected_waves(tmp_path: Path) -> None:
+    sequential = compile_plan(
+        load_scenario_file(FIXTURES / "sequential-valid.yaml"),
+        _config(tmp_path),
+        inputs={},
+        workspace=tmp_path,
+    )
+    parallel = compile_plan(
+        load_scenario_file(FIXTURES / "parallel-valid.yaml"),
+        _config(tmp_path),
+        inputs={"task": "compare"},
+        workspace=tmp_path,
+    )
+
+    assert sequential.waves == (("create",), ("review",))
+    assert parallel.waves == (("analyze_first", "analyze_second"), ("review",))
+    validate_document("execution-plan-v1", execution_plan_to_document(parallel))
+
+
+def test_cycle_is_rejected_before_execution(tmp_path: Path) -> None:
+    loaded = load_scenario_file(FIXTURES / "cycle-invalid.yaml")
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        compile_plan(loaded, _config(tmp_path), inputs={}, workspace=tmp_path)
+
+    assert captured.value.code is ErrorCode.SCENARIO_INVALID
+
+
+def test_missing_required_input_is_rejected(tmp_path: Path) -> None:
+    loaded = load_scenario_file(FIXTURES / "parallel-valid.yaml")
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        compile_plan(loaded, _config(tmp_path), inputs={}, workspace=tmp_path)
+
+    assert captured.value.code is ErrorCode.SCENARIO_INVALID
+    assert captured.value.details["input"] == "task"
+
+
+def test_model_allowlist_is_enforced(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "schema_version: gigacode-agent-runtime/config-v1\n"
+        "gigacode:\n  model_allowlist: [another-model]\n"
+    )
+    loaded = load_scenario_file(FIXTURES / "sequential-valid.yaml")
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        compile_plan(
+            loaded,
+            load_config(config_path, home=tmp_path),
+            inputs={},
+            workspace=tmp_path,
+        )
+
+    assert captured.value.code is ErrorCode.MODEL_NOT_ALLOWED
+
+
+def test_full_access_loop_is_capped_by_global_policy(tmp_path: Path) -> None:
+    plan = compile_plan(
+        load_scenario_file(FIXTURES / "full-access-loop.yaml"),
+        _config(tmp_path),
+        inputs={},
+        workspace=tmp_path,
+    )
+
+    loop = plan.steps[0]
+    assert isinstance(loop, LoopStepDefinition)
+    assert loop.max_iterations == 3
+    assert "approval_auto_edit" in plan.capability_requirements
+
+
+def test_scenario_cannot_raise_global_parallel_limit(tmp_path: Path) -> None:
+    document = (FIXTURES / "parallel-valid.yaml").read_text().replace(
+        "steps:\n",
+        "max_parallel_agents: 20\n\nsteps:\n",
+    )
+    path = tmp_path / "too-parallel.yaml"
+    path.write_text(document)
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        compile_plan(
+            load_scenario_file(path),
+            _config(tmp_path),
+            inputs={"task": "compare"},
+            workspace=tmp_path,
+        )
+
+    assert captured.value.code is ErrorCode.SCENARIO_INVALID

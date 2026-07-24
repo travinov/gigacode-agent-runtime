@@ -1,0 +1,38 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: sequential-valid
+  title: Sequential valid scenario
+
+agents:
+  creator:
+    model: code-model-id
+    permissions: propose_only
+    system_prompt: Create a structured draft.
+  reviewer:
+    model: review-model-id
+    permissions: read_only
+    system_prompt: Review a structured draft.
+
+steps:
+  create:
+    kind: agent
+    agent: creator
+    needs: []
+    prompt:
+      template: Create a draft.
+    output_schema:
+      type: object
+
+  review:
+    kind: agent
+    agent: reviewer
+    needs: [create]
+    prompt:
+      template: "Review: ${steps.create.output}"
+    output_schema:
+      type: object
+
+result:
+  from: "${steps.review.output}"

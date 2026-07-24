@@ -109,6 +109,7 @@ class LoopStepDefinition:
     name: str
     needs: tuple[str, ...]
     body: tuple[AgentStepDefinition, ...]
+    waves: tuple[tuple[str, ...], ...]
     until: Mapping[str, object]
     max_iterations: int
     timeout_seconds: int
@@ -134,11 +135,15 @@ class ExecutionPlan:
     config_hash: str
     inputs_hash: str
     metadata: ScenarioMetadata
+    source: ScenarioSource
     workspace: Path
+    inputs: Mapping[str, object]
     agents: Mapping[str, AgentDefinition]
     steps: tuple[ExecutionStepDefinition, ...]
     waves: tuple[tuple[str, ...], ...]
     max_parallel_agents: int
+    result_reference: str
+    resource_hashes: Mapping[str, str] = field(default_factory=dict)
     capability_requirements: tuple[str, ...] = ()
 
 
