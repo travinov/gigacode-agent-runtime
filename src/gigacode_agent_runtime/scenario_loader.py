@@ -16,6 +16,7 @@ from .errors import AgentRuntimeError, ErrorCode
 from .interpolation import validate_template
 from .schema_registry import validate_document
 from .source_resolver import ContainedSourceResolver, ResolvedResource
+from .yaml_loader import RuntimeSafeLoader, safe_load
 
 _SCENARIO_SUFFIXES = {".yaml", ".yml", ".json"}
 _MAX_SCENARIO_BYTES = 2 * 1024 * 1024
@@ -39,14 +40,14 @@ class ScenarioCatalogEntry:
 
 def _load_yaml_without_aliases(text: str, path: Path) -> object:
     try:
-        for event in yaml.parse(text, Loader=yaml.SafeLoader):
+        for event in yaml.parse(text, Loader=RuntimeSafeLoader):
             if isinstance(event, yaml.events.AliasEvent):
                 raise AgentRuntimeError(
                     ErrorCode.SCENARIO_INVALID,
                     "YAML aliases are not supported in scenarios",
                     details={"path": str(path)},
                 )
-        return yaml.safe_load(text)
+        return safe_load(text)
     except AgentRuntimeError:
         raise
     except yaml.YAMLError as exc:

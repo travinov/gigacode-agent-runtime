@@ -17,6 +17,7 @@ from .errors import AgentRuntimeError, ErrorCode
 from .paths import RuntimePaths, resolve_user_path
 from .schema_registry import validate_document
 from .version import CONFIG_SCHEMA_VERSION
+from .yaml_loader import safe_load
 
 _DEFAULT_DOCUMENT: dict[str, Any] = {
     "schema_version": CONFIG_SCHEMA_VERSION,
@@ -158,7 +159,7 @@ def _read_config(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"schema_version": CONFIG_SCHEMA_VERSION}
     try:
-        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+        loaded = safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
         raise AgentRuntimeError(
             ErrorCode.CONFIG_INVALID,

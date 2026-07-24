@@ -7,6 +7,7 @@ import re
 import shutil
 import uuid
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
@@ -180,6 +181,42 @@ class StateStore:
             transitioned = transition_run(state, target, updated_at=utc_timestamp())
             self.write(transitioned)
             return transitioned
+
+    def put_step(self, run_id: str, step: StepState) -> RunState:
+        lock_path = self.run_dir(run_id) / "state.lock"
+        with FileLock(lock_path, blocking=True):
+            state = self.read(run_id)
+            steps = dict(state.steps)
+            steps[step.instance_id] = step
+            updated = replace(
+                state,
+                steps=MappingProxyType(steps),
+                updated_at=utc_timestamp(),
+            )
+            self.write(updated)
+            return updated
+
+    def finish(
+        self,
+        run_id: str,
+        target: RunStatus,
+        *,
+        result: Mapping[str, object] | None = None,
+        error: Mapping[str, object] | None = None,
+    ) -> RunState:
+        lock_path = self.run_dir(run_id) / "state.lock"
+        with FileLock(lock_path, blocking=True):
+            state = self.read(run_id)
+            transitioned = transition_run(state, target, updated_at=utc_timestamp())
+            completed = replace(
+                transitioned,
+                result=(
+                    MappingProxyType(dict(result)) if result is not None else None
+                ),
+                error=MappingProxyType(dict(error)) if error is not None else None,
+            )
+            self.write(completed)
+            return completed
 
     def recover_interrupted(
         self,

@@ -163,12 +163,19 @@ def main() -> int:
         if delay:
             time.sleep(delay)
 
-        attempt = _next_attempt() if "fail_attempts" in profile else 1
+        attempt = (
+            _next_attempt()
+            if "fail_attempts" in profile or "invalid_attempts" in profile
+            else 1
+        )
         fail_attempts = int(profile.get("fail_attempts", 0))
         if attempt <= fail_attempts:
             exit_code = int(profile.get("exit_code", 75))
             print("transient fake failure", file=sys.stderr, flush=True)
             return exit_code
+        if attempt <= int(profile.get("invalid_attempts", 0)):
+            print("{invalid-json", flush=True)
+            return 0
 
         stderr = profile.get("stderr")
         if stderr:

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import re
 from collections.abc import Callable, Mapping, Sequence
 
 from .errors import AgentRuntimeError, ErrorCode
+from .hashing import canonical_json
 
 _REFERENCE = re.compile(r"\$\{([^{}]+)\}")
 
@@ -55,7 +55,7 @@ def validate_template(template: str) -> None:
 
 def _stringify_embedded(value: object) -> str:
     if isinstance(value, (Mapping, Sequence)) and not isinstance(value, (str, bytes)):
-        return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        return canonical_json(value)
     if value is None:
         return "null"
     if isinstance(value, bool):
