@@ -1,6 +1,6 @@
 """Runtime and persisted-contract versions."""
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 CONFIG_SCHEMA_VERSION = "gigacode-agent-runtime/config-v1"
 SCENARIO_SCHEMA_VERSION = "gigacode-agent-runtime/scenario-v1"
