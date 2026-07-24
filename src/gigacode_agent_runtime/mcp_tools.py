@@ -9,8 +9,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
 
-from .adapters.capabilities import find_gigacode_executable
-from .adapters.gigacode_qwen import GigaCodeQwenAdapter
+from .adapter_factory import create_gigacode_adapter
 from .approval_store import ApprovalStore
 from .config import EffectiveConfig
 from .domain import RunStatus
@@ -56,19 +55,7 @@ class McpToolService:
         self._dashboard_url = dashboard_url
 
     def _default_adapter(self) -> AgentAdapter:
-        executable = find_gigacode_executable(
-            self.config.gigacode.executable,
-            home=self.config.paths.home,
-            path=os.environ.get("PATH"),
-        )
-        return GigaCodeQwenAdapter(
-            executable=executable,
-            environment_allowlist=self.config.gigacode.environment_allowlist,
-            source_environment=os.environ,
-            max_stdout_bytes=self.config.runtime.max_stdout_bytes_per_step,
-            max_stderr_bytes=self.config.runtime.max_stderr_bytes_per_step,
-            graceful_cancel_seconds=self.config.runtime.graceful_cancel_seconds,
-        )
+        return create_gigacode_adapter(self.config)
 
     async def __aenter__(self) -> McpToolService:
         if not self._started:
