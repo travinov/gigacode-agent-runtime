@@ -4,6 +4,16 @@ V1 поддерживает корпоративный Mac с macOS 10.15+, ар
 Python 3.11–3.14. Установка не обращается к PyPI: ZIP содержит wheel runtime,
 совместимый wheelhouse, документацию, примеры и installer scripts.
 
+Если на машине разрешён доступ к GitHub Releases, тот же проверяемый installer
+можно запустить одной командой:
+
+```bash
+curl -fsSL https://github.com/travinov/gigacode-agent-runtime/releases/download/v1.0.0-rc.1/install.sh | sh
+```
+
+Этот bootstrap использует сеть только для получения release assets. После
+скачивания он проверяет опубликованный checksum и закреплённый SHA-256.
+
 ## Предварительная проверка
 
 На корпоративном Mac:

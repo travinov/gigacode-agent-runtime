@@ -14,3 +14,5 @@
 - Offline macOS x86_64 packaging, verification, and rollback contracts.
 - Release-candidate gates for real stdio MCP, offline dependency resolution,
   Web monitoring, recovery, and corporate acceptance evidence.
+- Checksum-pinned one-line GitHub bootstrap installer for supported corporate
+  macOS hosts.
