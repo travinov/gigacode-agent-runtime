@@ -62,12 +62,14 @@ mkdir -p "$STAGE_ROOT/scripts"
 cp "$SCRIPT_DIR/release_tool.py" "$STAGE_ROOT/scripts/release_tool.py"
 cp "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/CHANGELOG.md" \
   "$PROJECT_ROOT/LICENSE" "$STAGE_ROOT/"
+cp "$PROJECT_ROOT/install.sh" "$STAGE_ROOT/install.sh"
 
 find "$STAGE_ROOT" -type f \( -name ".DS_Store" -o -name "*.pyc" \) \
   -exec /bin/rm -f {} \;
 find "$STAGE_ROOT/installer" "$STAGE_ROOT/scripts" -type f -name "*.sh" \
   -exec chmod 755 {} \;
 chmod 755 "$STAGE_ROOT/scripts/release_tool.py"
+chmod 755 "$STAGE_ROOT/install.sh"
 
 "$PYTHON_BIN" "$SCRIPT_DIR/release_tool.py" manifest \
   "$STAGE_ROOT" "$PROJECT_ROOT/release-manifest.json"

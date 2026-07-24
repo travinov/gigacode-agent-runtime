@@ -188,6 +188,7 @@ def _verify_release_contract(
         raise ValueError("Release manifest must identify a release candidate")
 
     required = {
+        "install.sh",
         "installer/install-macos.sh",
         "installer/uninstall-macos.sh",
         "installer/verify-installation.sh",

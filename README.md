@@ -37,18 +37,18 @@ heartbeat, события, результаты и артефакты.
 
 ## Быстрый старт
 
-Онлайн-установка release candidate одной командой:
+После скачивания, проверки checksum и распаковки ZIP откройте терминал в
+распакованном каталоге и выполните:
 
 ```bash
-curl -fsSL https://github.com/travinov/gigacode-agent-runtime/releases/download/v1.0.0-rc.2/install.sh | sh
+./install.sh
 ```
 
-Bootstrap поддерживает macOS 10.15+ `x86_64`, скачивает ZIP и `.sha256`,
-сверяет checksum с закреплённым SHA-256 и только затем запускает штатный
-installer. Если корпоративная сеть не открывает GitHub, используйте
-[офлайн-установку](docs/offline-installation.md).
+Скрипт ничего не скачивает: он запускает штатный offline installer из этого же
+каталога. Если macOS не сохранила executable bit, используйте
+`sh ./install.sh`.
 
-После офлайн-установки:
+После установки:
 
 ```bash
 agent-runtime diagnose --json

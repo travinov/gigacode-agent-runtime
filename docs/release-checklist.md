@@ -50,7 +50,8 @@ gigacode-agent-runtime-v1.0.0-macos-x86_64.zip.sha256
 
 ZIP должен проходить manifest/hash/architecture verification, содержать ровно
 один корневой каталог и не содержать sdist, `.DS_Store`, symlink или wheel
-другой архитектуры.
+другой архитектуры. В корне ZIP должен находиться executable `install.sh`,
+который не использует сеть и делегирует штатному macOS installer.
 
 ## Неподменяемый внешний gate
 

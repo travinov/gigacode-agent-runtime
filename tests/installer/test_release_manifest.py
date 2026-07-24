@@ -19,6 +19,7 @@ def _write(path: Path, content: bytes = b"fixture") -> None:
 def _minimal_release(tmp_path: Path) -> Path:
     release = tmp_path / "gigacode-agent-runtime-v1.0.0-macos-x86_64"
     required = (
+        "install.sh",
         "installer/install-macos.sh",
         "installer/uninstall-macos.sh",
         "installer/verify-installation.sh",
@@ -57,6 +58,7 @@ def test_source_release_manifest_and_locks_are_complete() -> None:
     assert manifest["architectures"] == ["x86_64"]
     assert manifest["python_minors"] == ["3.11", "3.12", "3.13", "3.14"]
     assert manifest["release_stage"] == "release-candidate"
+    assert (ROOT / "install.sh").stat().st_mode & 0o111
     for minor in ("311", "312", "313", "314"):
         lock = (ROOT / "requirements" / f"runtime-py{minor}.lock").read_text()
         requirements = [

@@ -29,7 +29,7 @@ cd gigacode-agent-runtime-v1.0.0-macos-x86_64
 ## 3. Установить и проверить регистрацию
 
 ```bash
-./installer/install-macos.sh
+./install.sh
 ./installer/verify-installation.sh
 agent-runtime --version
 agent-runtime diagnose --json
