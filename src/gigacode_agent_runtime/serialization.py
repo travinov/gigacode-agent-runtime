@@ -20,7 +20,7 @@ def fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
-def atomic_write_json(path: Path, document: object) -> None:
+def atomic_write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.",
@@ -30,8 +30,7 @@ def atomic_write_json(path: Path, document: object) -> None:
     temporary_path = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(canonical_json(document))
-            handle.write("\n")
+            handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary_path, path)
@@ -39,3 +38,7 @@ def atomic_write_json(path: Path, document: object) -> None:
     finally:
         if temporary_path.exists():
             temporary_path.unlink()
+
+
+def atomic_write_json(path: Path, document: object) -> None:
+    atomic_write_text(path, f"{canonical_json(document)}\n")
