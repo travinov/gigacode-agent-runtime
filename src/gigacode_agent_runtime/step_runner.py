@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -32,6 +32,7 @@ class AgentAdapter(Protocol):
         *,
         timeout_seconds: float,
         capabilities: GigaCodeCapabilities | None = None,
+        on_process_started: Callable[[int, int], None] | None = None,
     ) -> AgentExecutionResult: ...
 
 
@@ -220,6 +221,30 @@ class StepRunner:
             step_instance_id=instance_id,
         )
 
+    def _process_started_callback(
+        self,
+        *,
+        step: AgentStepDefinition,
+        attempt: int,
+        iteration: int | None,
+        instance_id: str,
+    ) -> Callable[[int, int], None]:
+        def process_started(pid: int, pgid: int) -> None:
+            self._events.append(
+                "step.heartbeat",
+                {
+                    "step": step.name,
+                    "attempt": attempt,
+                    "iteration": iteration,
+                    "pid": pid,
+                    "pgid": pgid,
+                    "phase": "process_started",
+                },
+                step_instance_id=instance_id,
+            )
+
+        return process_started
+
     async def run(
         self,
         step: AgentStepDefinition,
@@ -267,6 +292,12 @@ class StepRunner:
                     if step.timeout_seconds is not None
                     else 900,
                     capabilities=self._capabilities,
+                    on_process_started=self._process_started_callback(
+                        step=step,
+                        attempt=attempt,
+                        iteration=iteration,
+                        instance_id=instance_id,
+                    ),
                 )
             except anyio.get_cancelled_exc_class():
                 self._states.put_step(

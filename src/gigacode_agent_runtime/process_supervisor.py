@@ -6,7 +6,7 @@ import asyncio
 import os
 import signal
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -86,6 +86,7 @@ class ProcessSupervisor:
         cwd: Path,
         environment: Mapping[str, str],
         timeout_seconds: float,
+        on_started: Callable[[int, int], None] | None = None,
     ) -> ProcessResult:
         started = time.monotonic()
         process = await asyncio.create_subprocess_exec(
@@ -97,6 +98,8 @@ class ProcessSupervisor:
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
         )
+        if on_started is not None:
+            on_started(process.pid, process.pid)
         assert process.stdout is not None
         assert process.stderr is not None
         assert process.stdin is not None

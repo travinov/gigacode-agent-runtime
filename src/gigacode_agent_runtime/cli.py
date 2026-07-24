@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import webbrowser
 from collections.abc import Mapping, Sequence
 from functools import partial
 from pathlib import Path
@@ -243,6 +244,36 @@ async def _follow_events(
         await anyio.sleep(0.25)
 
 
+async def _dashboard_foreground(
+    config: EffectiveConfig,
+    run_id: str | None,
+    *,
+    open_browser: bool,
+    as_json: bool,
+) -> int:
+    tools = McpToolService(config)
+    async with tools:
+        response = await tools.open_dashboard(run_id)
+        if response["ok"] is not True:
+            raw = response["error"]
+            assert isinstance(raw, dict)
+            raise AgentRuntimeError(
+                ErrorCode(str(raw["code"])),
+                str(raw["message"]),
+                details=(
+                    raw["details"] if isinstance(raw.get("details"), dict) else {}
+                ),
+            )
+        data = response["data"]
+        assert isinstance(data, dict)
+        url = str(data["url"])
+        emit({"url": url}, as_json=as_json, human=url)
+        if open_browser:
+            webbrowser.open(url)
+        await anyio.sleep_forever()
+    return 0
+
+
 def _cancel_inactive(config: EffectiveConfig, run_id: str) -> dict[str, object]:
     states = StateStore(config.paths.runs)
     state = states.read(run_id)
@@ -374,9 +405,14 @@ def _execute(arguments: argparse.Namespace, config: EffectiveConfig) -> int:
         emit(document, as_json=as_json)
         return state_exit_code(RunStatus(str(document["status"])))
     if arguments.command == "dashboard":
-        raise AgentRuntimeError(
-            ErrorCode.CAPABILITY_UNAVAILABLE,
-            "Dashboard backend is not started yet",
+        return anyio.run(
+            partial(
+                _dashboard_foreground,
+                open_browser=arguments.open_browser,
+                as_json=as_json,
+            ),
+            config,
+            arguments.run_id,
         )
     if arguments.command == "mcp-serve":
         tools = McpToolService(

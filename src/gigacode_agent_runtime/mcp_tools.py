@@ -7,7 +7,7 @@ import os
 import sys
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from .adapter_factory import create_gigacode_adapter
 from .approval_store import ApprovalStore
@@ -28,6 +28,9 @@ from .state_store import StateStore, run_state_to_document
 from .step_runner import AgentAdapter
 
 AdapterFactory = Callable[[], AgentAdapter]
+
+if TYPE_CHECKING:
+    from .web.server import LocalWebServer
 
 
 class McpToolService:
@@ -53,6 +56,7 @@ class McpToolService:
         )
         self._adapter_factory = adapter_factory or self._default_adapter
         self._dashboard_url = dashboard_url
+        self._web_server: LocalWebServer | None = None
 
     def _default_adapter(self) -> AgentAdapter:
         return create_gigacode_adapter(self.config)
@@ -70,6 +74,9 @@ class McpToolService:
         traceback: object,
     ) -> None:
         if self._started:
+            if self._web_server is not None:
+                await self._web_server.stop()
+                self._web_server = None
             await self._manager.__aexit__(exc_type, exc_value, traceback)
             self._started = False
 
@@ -91,6 +98,25 @@ class McpToolService:
         if not path.exists():
             atomic_write_text(path, text)
         return load_scenario_file(path)
+
+    async def _ensure_dashboard(self, run_id: str | None) -> str:
+        if self._dashboard_url is not None:
+            return self._dashboard_url(run_id)
+        if not self.config.web.enabled:
+            raise AgentRuntimeError(
+                ErrorCode.CAPABILITY_UNAVAILABLE,
+                "Local dashboard is disabled in runtime configuration",
+            )
+        if self._web_server is None:
+            from .web.server import LocalWebServer
+
+            self._web_server = LocalWebServer(
+                self,
+                host=self.config.web.host,
+                port=self.config.web.port,
+            )
+            await self._web_server.start()
+        return self._web_server.url(run_id)
 
     def _scenario(
         self,
@@ -224,7 +250,7 @@ class McpToolService:
         inputs: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, object]:
-        def operation() -> dict[str, object]:
+        async def operation() -> dict[str, object]:
             self._require_started()
             scenario = self._scenario(
                 scenario_name=scenario_name,
@@ -244,15 +270,16 @@ class McpToolService:
                     prepared,
                     DagScheduler(prepared.config, self._adapter_factory()),
                 )
+            dashboard_url = (
+                await self._ensure_dashboard(prepared.run_id)
+                if self.config.web.enabled
+                else None
+            )
             return {
                 "run_id": prepared.run_id,
                 "status": prepared.state.status.value,
                 "plan_hash": prepared.plan.plan_hash,
-                "dashboard_url": (
-                    self._dashboard_url(prepared.run_id)
-                    if self._dashboard_url is not None
-                    else None
-                ),
+                "dashboard_url": dashboard_url,
             }
 
         return await public_result(operation)
@@ -392,12 +419,8 @@ class McpToolService:
         return await public_result(operation)
 
     async def open_dashboard(self, run_id: str | None = None) -> dict[str, object]:
-        def operation() -> dict[str, object]:
-            if self._dashboard_url is None:
-                raise AgentRuntimeError(
-                    ErrorCode.CAPABILITY_UNAVAILABLE,
-                    "Local dashboard is not started",
-                )
-            return {"url": self._dashboard_url(run_id)}
+        async def operation() -> dict[str, object]:
+            self._require_started()
+            return {"url": await self._ensure_dashboard(run_id)}
 
         return await public_result(operation)

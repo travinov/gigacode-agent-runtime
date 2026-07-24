@@ -118,3 +118,9 @@ class EventLog:
             next_cursor=next_cursor,
             has_more=len(events) > len(selected),
         )
+
+    def tail(self, *, limit: int = 100) -> tuple[RunEvent, ...]:
+        if not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        with FileLock(self._lock_path, blocking=True):
+            return tuple(self._load_unlocked()[-limit:])

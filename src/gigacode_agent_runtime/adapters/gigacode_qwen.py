@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -175,6 +175,7 @@ class GigaCodeQwenAdapter:
         *,
         timeout_seconds: float,
         capabilities: GigaCodeCapabilities | None = None,
+        on_process_started: Callable[[int, int], None] | None = None,
     ) -> AgentExecutionResult:
         detected = capabilities or await self.detect_capabilities()
         argv, input_text, output_format = self._command(request, detected)
@@ -184,6 +185,7 @@ class GigaCodeQwenAdapter:
             cwd=request.workspace.resolve(strict=True),
             environment=self._environment,
             timeout_seconds=timeout_seconds,
+            on_started=on_process_started,
         )
         redacted_stderr = self._redactor.redact_text(process.stderr)
         if process.timed_out:

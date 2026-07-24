@@ -164,3 +164,15 @@ class InputGateStore:
             {"gate_id": gate_id},
         )
         return {"gate_id": gate_id, "value": value}
+
+    def active(self) -> dict[str, object] | None:
+        with FileLock(self._lock_path, blocking=True):
+            gates = self._load_unlocked()
+        for gate_id, gate in sorted(gates.items()):
+            if gate.get("status") == "waiting":
+                return {
+                    "gate_id": gate_id,
+                    "prompt": gate.get("prompt"),
+                    "input_schema": gate.get("input_schema"),
+                }
+        return None
