@@ -1,0 +1,25 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: path-escape
+  title: Path escape
+
+agents:
+  analyst:
+    model: code-model-id
+    permissions: read_only
+    system_prompt_file: ../outside-system-prompt.md
+
+steps:
+  analyze:
+    kind: agent
+    agent: analyst
+    needs: []
+    prompt:
+      template: Analyze safely.
+    output_schema:
+      type: object
+
+result:
+  from: "${steps.analyze.output}"

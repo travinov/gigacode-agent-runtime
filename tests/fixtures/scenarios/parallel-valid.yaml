@@ -1,0 +1,56 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: parallel-valid
+  title: Parallel valid scenario
+
+inputs:
+  task:
+    type: string
+    required: true
+
+agents:
+  first:
+    model: code-model-id
+    permissions: read_only
+    system_prompt: Analyze from the first perspective.
+  second:
+    model: review-model-id
+    permissions: read_only
+    system_prompt: Analyze from the second perspective.
+  reviewer:
+    model: review-model-id
+    permissions: propose_only
+    system_prompt: Compare both analyses.
+
+steps:
+  analyze_first:
+    kind: agent
+    agent: first
+    needs: []
+    prompt:
+      template: "Analyze: ${inputs.task}"
+    output_schema:
+      type: object
+
+  analyze_second:
+    kind: agent
+    agent: second
+    needs: []
+    prompt:
+      template: "Analyze independently: ${inputs.task}"
+    output_schema:
+      type: object
+
+  review:
+    kind: agent
+    agent: reviewer
+    needs: [analyze_first, analyze_second]
+    prompt:
+      template: "Compare ${steps.analyze_first.output} and ${steps.analyze_second.output}"
+    output_schema:
+      type: object
+
+result:
+  from: "${steps.review.output}"
