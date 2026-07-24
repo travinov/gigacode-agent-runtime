@@ -1,0 +1,10 @@
+{
+  "delay_seconds": 0,
+  "exit_code": 0,
+  "omit_help_flags": [
+    "--sandbox"
+  ],
+  "result": {
+    "summary": "no sandbox capability"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "delay_seconds": 0,
+  "exit_code": 75,
+  "fail_attempts": 1,
+  "result": {
+    "summary": "recovered"
+  }
+}

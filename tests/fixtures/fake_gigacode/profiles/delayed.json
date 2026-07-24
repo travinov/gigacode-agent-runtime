@@ -1,0 +1,7 @@
+{
+  "delay_seconds": 0.3,
+  "exit_code": 0,
+  "result": {
+    "summary": "delayed success"
+  }
+}
