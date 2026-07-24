@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gigacode-agent-runtime.local/schemas/run-state-v1.schema.json",
+  "title": "GigaCode Agent Runtime run state v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "plan_hash",
+    "status",
+    "created_at",
+    "updated_at",
+    "steps"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "gigacode-agent-runtime/run-state-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^run_[A-Za-z0-9_-]+$"
+    },
+    "plan_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "validating",
+        "planned",
+        "running",
+        "waiting_for_input",
+        "waiting_for_approval",
+        "paused",
+        "interrupted",
+        "completed",
+        "completed_best_effort",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "steps": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/stepState"
+      }
+    },
+    "result": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "error": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stepState": {
+      "type": "object",
+      "required": [
+        "instance_id",
+        "status",
+        "attempt"
+      ],
+      "properties": {
+        "instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "ready",
+            "running",
+            "retrying",
+            "waiting_for_input",
+            "waiting_for_approval",
+            "skipped",
+            "blocked",
+            "interrupted",
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "iteration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "output": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

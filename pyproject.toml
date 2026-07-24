@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling>=1.27,<2"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "gigacode-agent-runtime"
@@ -8,13 +8,13 @@ version = "0.1.0"
 description = "Local MCP runtime for declarative multi-agent GigaCode workflows"
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
-license = { file = "LICENSE" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
   { name = "GigaCode Agent Runtime contributors" },
 ]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
-  "License :: OSI Approved :: Apache Software License",
   "Operating System :: MacOS",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
@@ -40,13 +40,20 @@ dev = [
   "pytest-timeout>=2.3,<3",
   "ruff>=0.11,<1",
   "types-PyYAML>=6.0,<7",
+  "types-jsonschema>=4.23,<5",
 ]
 
 [project.scripts]
 agent-runtime = "gigacode_agent_runtime.cli:main"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/gigacode_agent_runtime"]
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.data-files]
+"share/gigacode-agent-runtime/schemas" = ["schemas/*.schema.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,35 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: minimal-valid
+  title: Minimal valid scenario
+
+inputs:
+  task:
+    type: string
+    required: true
+
+agents:
+  analyst:
+    model: code-model-id
+    permissions: read_only
+    system_prompt: Analyze the task and return structured JSON.
+
+steps:
+  analyze:
+    kind: agent
+    agent: analyst
+    needs: []
+    prompt:
+      template: "Analyze: ${inputs.task}"
+    output_schema:
+      type: object
+      required: [summary]
+      properties:
+        summary:
+          type: string
+      additionalProperties: false
+
+result:
+  from: "${steps.analyze.output}"

@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gigacode-agent-runtime.local/schemas/config-v1.schema.json",
+  "title": "GigaCode Agent Runtime configuration v1",
+  "type": "object",
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {
+      "const": "gigacode-agent-runtime/config-v1"
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "data_dir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_parallel_agents": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "default_step_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "graceful_cancel_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_stdout_bytes_per_step": {
+          "type": "integer",
+          "minimum": 1024
+        },
+        "max_stderr_bytes_per_step": {
+          "type": "integer",
+          "minimum": 1024
+        }
+      },
+      "additionalProperties": false
+    },
+    "gigacode": {
+      "type": "object",
+      "properties": {
+        "executable": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "environment_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "permissions": {
+      "type": "object",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/permission"
+        },
+        "allow_full_access": {
+          "type": "boolean"
+        },
+        "require_full_access_confirmation": {
+          "type": "boolean"
+        },
+        "max_parallel_full_access_agents": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_full_access_loop_iterations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "trusted_scenario_hashes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "web": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "host": {
+          "const": "127.0.0.1"
+        },
+        "port": {
+          "oneOf": [
+            {
+              "const": "auto"
+            },
+            {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535
+            }
+          ]
+        },
+        "open_automatically": {
+          "const": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "permission": {
+      "enum": [
+        "read_only",
+        "propose_only",
+        "workspace_write",
+        "full_access"
+      ]
+    }
+  }
+}

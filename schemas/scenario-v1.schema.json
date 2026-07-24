@@ -1,0 +1,454 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gigacode-agent-runtime.local/schemas/scenario-v1.schema.json",
+  "title": "GigaCode Agent Runtime scenario v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "metadata",
+    "agents",
+    "steps",
+    "result"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "gigacode-agent-runtime/scenario-v1"
+    },
+    "kind": {
+      "const": "Scenario"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/input"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "agents": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/agent"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "steps": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/step"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "max_parallel_agents": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "result": {
+      "type": "object",
+      "required": ["from"],
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name", "title"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      },
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": [
+            "string",
+            "integer",
+            "number",
+            "boolean",
+            "object",
+            "array"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "default": true
+      },
+      "additionalProperties": false
+    },
+    "permission": {
+      "enum": [
+        "read_only",
+        "propose_only",
+        "workspace_write",
+        "full_access"
+      ]
+    },
+    "agent": {
+      "type": "object",
+      "required": ["model", "permissions"],
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "permissions": {
+          "$ref": "#/$defs/permission"
+        },
+        "system_prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system_prompt_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["system_prompt"],
+          "not": {
+            "required": ["system_prompt_file"]
+          }
+        },
+        {
+          "required": ["system_prompt_file"],
+          "not": {
+            "required": ["system_prompt"]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "prompt": {
+      "type": "object",
+      "properties": {
+        "template": {
+          "type": "string",
+          "minLength": 1
+        },
+        "template_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context": {
+          "type": "object"
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["template"],
+          "not": {
+            "required": ["template_file"]
+          }
+        },
+        {
+          "required": ["template_file"],
+          "not": {
+            "required": ["template"]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "retry": {
+      "type": "object",
+      "required": ["max_attempts"],
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "backoff_seconds": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "maxItems": 19
+        },
+        "on": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "process_error",
+              "transient_cli_error",
+              "invalid_output",
+              "timeout"
+            ]
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "simpleCondition": {
+      "type": "object",
+      "required": ["ref", "op"],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "op": {
+          "enum": [
+            "eq",
+            "ne",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "contains",
+            "exists"
+          ]
+        },
+        "value": true
+      },
+      "additionalProperties": false
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/simpleCondition"
+        },
+        {
+          "type": "object",
+          "required": ["all"],
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/condition"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["any"],
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/condition"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["not"],
+          "properties": {
+            "not": {
+              "$ref": "#/$defs/condition"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "agentStep": {
+      "type": "object",
+      "required": [
+        "kind",
+        "agent",
+        "needs",
+        "prompt",
+        "output_schema"
+      ],
+      "properties": {
+        "kind": {
+          "const": "agent"
+        },
+        "agent": {
+          "$ref": "#/$defs/identifier"
+        },
+        "needs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identifier"
+          },
+          "uniqueItems": true
+        },
+        "prompt": {
+          "$ref": "#/$defs/prompt"
+        },
+        "output_schema": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "object"
+            }
+          ]
+        },
+        "when": {
+          "$ref": "#/$defs/condition"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "retry": {
+          "$ref": "#/$defs/retry"
+        }
+      },
+      "additionalProperties": false
+    },
+    "noProgress": {
+      "type": "object",
+      "required": [
+        "max_unchanged_iterations",
+        "fingerprint"
+      ],
+      "properties": {
+        "max_unchanged_iterations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fingerprint": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "loopStep": {
+      "type": "object",
+      "required": [
+        "kind",
+        "needs",
+        "body",
+        "until"
+      ],
+      "properties": {
+        "kind": {
+          "const": "loop"
+        },
+        "needs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identifier"
+          },
+          "uniqueItems": true
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "on_limit": {
+          "enum": [
+            "fail",
+            "pause",
+            "best_effort"
+          ]
+        },
+        "no_progress": {
+          "$ref": "#/$defs/noProgress"
+        },
+        "body": {
+          "type": "object",
+          "required": ["steps"],
+          "properties": {
+            "steps": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "$ref": "#/$defs/agentStep"
+              },
+              "propertyNames": {
+                "$ref": "#/$defs/identifier"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "until": {
+          "$ref": "#/$defs/condition"
+        }
+      },
+      "anyOf": [
+        {
+          "required": ["max_iterations"]
+        },
+        {
+          "required": ["timeout_seconds"]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "step": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/agentStep"
+        },
+        {
+          "$ref": "#/$defs/loopStep"
+        }
+      ]
+    }
+  }
+}

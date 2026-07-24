@@ -1,0 +1,26 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: invalid-unknown-key
+  title: Invalid scenario
+  unsupported: true
+
+agents:
+  analyst:
+    model: code-model-id
+    permissions: read_only
+    system_prompt: Analyze.
+
+steps:
+  analyze:
+    kind: agent
+    agent: analyst
+    needs: []
+    prompt:
+      template: Analyze.
+    output_schema:
+      type: object
+
+result:
+  from: "${steps.analyze.output}"
