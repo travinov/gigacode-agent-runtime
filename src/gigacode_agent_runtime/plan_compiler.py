@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
@@ -25,11 +25,13 @@ from .domain import (
     PromptDefinition,
     RetryPolicy,
     ScenarioMetadata,
+    ScenarioSource,
 )
 from .errors import AgentRuntimeError, ErrorCode
 from .hashing import json_object, sha256_digest
 from .interpolation import extract_references
 from .scenario_loader import LoadedScenario
+from .schema_registry import validate_document
 from .version import EXECUTION_PLAN_SCHEMA_VERSION
 
 _DEFAULT_LOOP_ITERATIONS = 10
@@ -390,6 +392,157 @@ def execution_plan_to_document(plan: ExecutionPlan) -> dict[str, Any]:
         "resource_hashes": dict(plan.resource_hashes),
         "capability_requirements": list(plan.capability_requirements),
     }
+
+
+def _agent_step_from_document(raw: Mapping[str, Any]) -> AgentStepDefinition:
+    retry_raw = cast(Mapping[str, Any], raw["retry"])
+    prompt_raw = cast(Mapping[str, Any], raw["prompt"])
+    condition = raw.get("condition")
+    return AgentStepDefinition(
+        name=str(raw["name"]),
+        agent=str(raw["agent"]),
+        needs=tuple(str(item) for item in raw["needs"]),
+        prompt=PromptDefinition(
+            template=str(prompt_raw["template"]),
+            context=_freeze_mapping(
+                cast(Mapping[str, object], prompt_raw.get("context", {}))
+            ),
+        ),
+        output_schema=_freeze_mapping(
+            cast(Mapping[str, object], raw["output_schema"])
+        ),
+        timeout_seconds=(
+            int(raw["timeout_seconds"])
+            if raw.get("timeout_seconds") is not None
+            else None
+        ),
+        retry=RetryPolicy(
+            max_attempts=int(retry_raw["max_attempts"]),
+            backoff_seconds=tuple(
+                float(value) for value in retry_raw.get("backoff_seconds", [])
+            ),
+            retry_on=tuple(
+                FailureReason(str(value)) for value in retry_raw.get("retry_on", [])
+            ),
+        ),
+        condition=(
+            _freeze_mapping(cast(Mapping[str, object], condition))
+            if isinstance(condition, Mapping)
+            else None
+        ),
+    )
+
+
+def execution_plan_from_document(document: Mapping[str, Any]) -> ExecutionPlan:
+    """Rehydrate and authenticate the immutable plan used by resume."""
+
+    validate_document("execution-plan-v1", document)
+    hash_document = dict(document)
+    expected_hash = str(hash_document.pop("plan_hash"))
+    hash_document.pop("source")
+    actual_hash = sha256_digest(hash_document)
+    if actual_hash != expected_hash:
+        raise AgentRuntimeError(
+            ErrorCode.STATE_CORRUPTED,
+            "Execution plan hash does not match its contents",
+            details={"expected": expected_hash, "actual": actual_hash},
+        )
+    try:
+        source_raw = cast(Mapping[str, Any], document["source"])
+        agents_raw = cast(Mapping[str, Mapping[str, Any]], document["agents"])
+        agents = MappingProxyType(
+            {
+                name: AgentDefinition(
+                    name=str(raw["name"]),
+                    model=str(raw["model"]),
+                    permissions=PermissionMode(str(raw["permissions"])),
+                    system_prompt=str(raw["system_prompt"]),
+                    allowed_tools=tuple(
+                        str(item) for item in raw.get("allowed_tools", [])
+                    ),
+                )
+                for name, raw in agents_raw.items()
+            }
+        )
+        steps: list[AgentStepDefinition | LoopStepDefinition] = []
+        for raw_value in cast(Sequence[Mapping[str, Any]], document["steps"]):
+            raw = raw_value
+            if "body" not in raw:
+                steps.append(_agent_step_from_document(raw))
+                continue
+            body = tuple(
+                _agent_step_from_document(item)
+                for item in cast(Sequence[Mapping[str, Any]], raw["body"])
+            )
+            steps.append(
+                LoopStepDefinition(
+                    name=str(raw["name"]),
+                    needs=tuple(str(item) for item in raw["needs"]),
+                    body=body,
+                    waves=tuple(
+                        tuple(str(name) for name in wave)
+                        for wave in cast(Sequence[Sequence[object]], raw["waves"])
+                    ),
+                    until=_freeze_mapping(
+                        cast(Mapping[str, object], raw["until"])
+                    ),
+                    max_iterations=int(raw["max_iterations"]),
+                    timeout_seconds=int(raw["timeout_seconds"]),
+                    on_limit=OnLimit(str(raw["on_limit"])),
+                    no_progress=(
+                        _freeze_mapping(
+                            cast(Mapping[str, object], raw["no_progress"])
+                        )
+                        if isinstance(raw.get("no_progress"), Mapping)
+                        else None
+                    ),
+                )
+            )
+        return ExecutionPlan(
+            schema_version=str(document["schema_version"]),
+            plan_hash=expected_hash,
+            scenario_hash=str(document["scenario_hash"]),
+            config_hash=str(document["config_hash"]),
+            inputs_hash=str(document["inputs_hash"]),
+            metadata=ScenarioMetadata(
+                name=str(document["scenario_name"]),
+                title=str(document["scenario_title"]),
+            ),
+            source=ScenarioSource(
+                level=str(source_raw["level"]),
+                path=Path(str(source_raw["path"])),
+                root=Path(str(source_raw["root"])),
+            ),
+            workspace=Path(str(document["workspace"])),
+            inputs=_freeze_mapping(
+                cast(Mapping[str, object], document["inputs"])
+            ),
+            agents=agents,
+            steps=tuple(steps),
+            waves=tuple(
+                tuple(str(name) for name in wave)
+                for wave in cast(Sequence[Sequence[object]], document["waves"])
+            ),
+            max_parallel_agents=int(document["max_parallel_agents"]),
+            result_reference=str(document["result_reference"]),
+            resource_hashes=MappingProxyType(
+                {
+                    str(name): str(value)
+                    for name, value in cast(
+                        Mapping[str, object],
+                        document["resource_hashes"],
+                    ).items()
+                }
+            ),
+            capability_requirements=tuple(
+                str(item) for item in document["capability_requirements"]
+            ),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AgentRuntimeError(
+            ErrorCode.STATE_CORRUPTED,
+            "Execution plan snapshot cannot be rehydrated",
+        ) from exc
 
 
 def compile_plan(

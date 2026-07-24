@@ -1,0 +1,17 @@
+{
+  "delay_seconds": 0,
+  "exit_code": 0,
+  "sequence_results": [
+    {
+      "approved": false,
+      "feedback": "repair once"
+    },
+    {
+      "summary": "repaired candidate"
+    },
+    {
+      "approved": true,
+      "feedback": "accepted"
+    }
+  ]
+}

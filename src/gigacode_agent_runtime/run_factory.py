@@ -22,6 +22,7 @@ from .state_store import StateStore
 class PreparedRun:
     run_id: str
     run_dir: Path
+    config: EffectiveConfig
     plan: ExecutionPlan
     state: RunState
     events: EventLog
@@ -111,6 +112,7 @@ def create_run(
     return PreparedRun(
         run_id=state.run_id,
         run_dir=run_dir,
+        config=config,
         plan=plan,
         state=state,
         events=events,

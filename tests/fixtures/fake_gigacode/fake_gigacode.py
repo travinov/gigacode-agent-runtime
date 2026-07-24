@@ -111,13 +111,22 @@ def _help(profile: dict[str, Any]) -> str:
     return "\n".join(line for line in lines if not any(flag in line for flag in omitted))
 
 
-def _emit_result(profile: dict[str, Any], output_format: str) -> None:
+def _emit_result(
+    profile: dict[str, Any],
+    output_format: str,
+    *,
+    result_override: object | None = None,
+) -> None:
     if profile.get("no_output"):
         return
     if profile.get("invalid_json"):
         print("{invalid-json", flush=True)
         return
-    result = profile.get("result", {"summary": "fake success"})
+    result = (
+        result_override
+        if result_override is not None
+        else profile.get("result", {"summary": "fake success"})
+    )
     if output_format == "stream-json":
         print(
             json.dumps(
@@ -165,7 +174,11 @@ def main() -> int:
 
         attempt = (
             _next_attempt()
-            if "fail_attempts" in profile or "invalid_attempts" in profile
+            if (
+                "fail_attempts" in profile
+                or "invalid_attempts" in profile
+                or "sequence_results" in profile
+            )
             else 1
         )
         fail_attempts = int(profile.get("fail_attempts", 0))
@@ -182,7 +195,15 @@ def main() -> int:
             print(str(stderr), file=sys.stderr, flush=True)
         exit_code = 0 if fail_attempts else int(profile.get("exit_code", 0))
         if exit_code == 0:
-            _emit_result(profile, _option_value(arguments, "--output-format", "text"))
+            sequence = profile.get("sequence_results")
+            result_override = None
+            if isinstance(sequence, list) and sequence:
+                result_override = sequence[min(attempt - 1, len(sequence) - 1)]
+            _emit_result(
+                profile,
+                _option_value(arguments, "--output-format", "text"),
+                result_override=result_override,
+            )
         return exit_code
     finally:
         _append_trace(

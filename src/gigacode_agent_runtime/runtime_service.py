@@ -7,10 +7,13 @@ from pathlib import Path
 
 from .artifacts import ArtifactStore
 from .config import EffectiveConfig
+from .domain import ExecutionPlan, RunStatus
+from .errors import AgentRuntimeError, ErrorCode
 from .event_log import EventLog
 from .hashing import sha256_digest
 from .idempotency import IdempotencyStore
 from .plan_compiler import compile_plan
+from .resume import open_prepared_run
 from .run_factory import PreparedRun, create_run
 from .scenario_loader import LoadedScenario
 from .state_store import StateStore
@@ -22,16 +25,13 @@ class RuntimeService:
         self._states = StateStore(config.paths.runs)
         self._idempotency = IdempotencyStore(config.runtime.data_dir)
 
-    def _prepared_existing(self, run_id: str, plan: object) -> PreparedRun:
-        from .domain import ExecutionPlan
-
-        if not isinstance(plan, ExecutionPlan):
-            raise TypeError("plan must be an ExecutionPlan")
+    def _prepared_existing(self, run_id: str, plan: ExecutionPlan) -> PreparedRun:
         state = self._states.read(run_id)
         run_dir = self._states.run_dir(run_id)
         return PreparedRun(
             run_id=run_id,
             run_dir=run_dir,
+            config=self.config,
             plan=plan,
             state=state,
             events=EventLog(run_dir, run_id=run_id),
@@ -88,3 +88,32 @@ class RuntimeService:
             "status": state.status.value,
             "result": dict(state.result) if state.result is not None else None,
         }
+
+    def open_run(
+        self,
+        run_id: str,
+        *,
+        recover_running: bool = True,
+    ) -> PreparedRun:
+        return open_prepared_run(
+            self.config,
+            run_id,
+            recover_running=recover_running,
+        )
+
+    def prepare_resume(self, run_id: str) -> PreparedRun:
+        prepared = self.open_run(run_id)
+        if prepared.state.status not in {
+            RunStatus.INTERRUPTED,
+            RunStatus.PAUSED,
+            RunStatus.WAITING_FOR_APPROVAL,
+        }:
+            raise AgentRuntimeError(
+                ErrorCode.INVALID_STATE_TRANSITION,
+                f"Run cannot be resumed from {prepared.state.status.value}",
+                details={
+                    "run_id": run_id,
+                    "status": prepared.state.status.value,
+                },
+            )
+        return prepared

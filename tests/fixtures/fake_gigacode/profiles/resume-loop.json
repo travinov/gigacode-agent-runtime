@@ -1,0 +1,13 @@
+{
+  "delay_seconds": 0,
+  "exit_code": 0,
+  "sequence_results": [
+    {
+      "summary": "repaired after resume"
+    },
+    {
+      "approved": true,
+      "feedback": "accepted after resume"
+    }
+  ]
+}

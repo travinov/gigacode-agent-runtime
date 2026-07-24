@@ -42,10 +42,24 @@ class StepOutcome:
     error: AgentRuntimeError | None
     attempt: int
     cancelled: bool = False
+    paused: bool = False
+    best_effort: bool = False
 
     @property
     def succeeded(self) -> bool:
-        return self.output is not None and self.error is None and not self.cancelled
+        return (
+            self.output is not None
+            and self.error is None
+            and not self.cancelled
+            and not self.paused
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class LoopContext:
+    iteration: int
+    current: Mapping[str, Mapping[str, object]]
+    previous: Mapping[str, Mapping[str, object]]
 
 
 def _descend(value: object, parts: list[str], reference: str) -> object:
@@ -81,7 +95,11 @@ class StepRunner:
         self._events = events
         self._artifacts = artifacts
 
-    def _resolve(self, reference: str) -> object:
+    def _resolve(
+        self,
+        reference: str,
+        loop: LoopContext | None = None,
+    ) -> object:
         parts = reference.split(".")
         if parts[0] == "inputs":
             return _descend(self._plan.inputs, parts[1:], reference)
@@ -98,19 +116,61 @@ class StepRunner:
             return self._run_id
         if parts == ["workspace", "root"]:
             return str(self._plan.workspace)
+        if parts == ["loop", "iteration"] and loop is not None:
+            return loop.iteration
+        if (
+            len(parts) >= 4
+            and parts[0] == "loop"
+            and parts[1] in {"steps", "previous", "previous_or_initial"}
+            and parts[3] == "output"
+            and loop is not None
+        ):
+            name = parts[2]
+            if parts[1] == "steps":
+                source = loop.current
+            elif parts[1] == "previous":
+                source = loop.previous
+            else:
+                source = loop.previous
+                if name not in source:
+                    top_level = self._states.read(self._run_id).steps.get(name)
+                    if top_level is not None and top_level.output is not None:
+                        return _descend(top_level.output, parts[4:], reference)
+            if name not in source:
+                raise AgentRuntimeError(
+                    ErrorCode.SCENARIO_INVALID,
+                    f"Loop output is unavailable: {name}",
+                    details={"reference": reference},
+                )
+            return _descend(source[name], parts[4:], reference)
         raise AgentRuntimeError(
             ErrorCode.SCENARIO_INVALID,
             f"Interpolation reference is unavailable: {reference}",
             details={"reference": reference},
         )
 
-    def _render_prompt(self, step: AgentStepDefinition) -> str:
-        rendered = interpolate(step.prompt.template, self._resolve)
+    def resolve_reference(
+        self,
+        reference: str,
+        *,
+        loop_context: LoopContext | None = None,
+    ) -> object:
+        return self._resolve(reference, loop_context)
+
+    def _render_prompt(
+        self,
+        step: AgentStepDefinition,
+        loop: LoopContext | None,
+    ) -> str:
+        def resolve(reference: str) -> object:
+            return self._resolve(reference, loop)
+
+        rendered = interpolate(step.prompt.template, resolve)
         prompt = rendered if isinstance(rendered, str) else canonical_json(rendered)
         if step.prompt.context:
             context = {
                 key: (
-                    interpolate(value, self._resolve)
+                    interpolate(value, resolve)
                     if isinstance(value, str)
                     else value
                 )
@@ -137,11 +197,35 @@ class StepRunner:
             step_instance_id=instance_id,
         )
 
+    def mark_skipped(
+        self,
+        step: AgentStepDefinition,
+        *,
+        iteration: int | None = None,
+    ) -> None:
+        instance_id = (
+            step.name if iteration is None else f"{step.name}@iteration-{iteration}"
+        )
+        self._states.put_step(
+            self._run_id,
+            StepState(
+                instance_id=instance_id,
+                status=StepStatus.SKIPPED,
+                iteration=iteration,
+            ),
+        )
+        self._events.append(
+            "step.skipped",
+            {"step": step.name, "iteration": iteration},
+            step_instance_id=instance_id,
+        )
+
     async def run(
         self,
         step: AgentStepDefinition,
         *,
         iteration: int | None = None,
+        loop_context: LoopContext | None = None,
     ) -> StepOutcome:
         instance_id = (
             step.name if iteration is None else f"{step.name}@iteration-{iteration}"
@@ -173,7 +257,7 @@ class StepRunner:
                     AgentRequest(
                         model=agent.model,
                         system_prompt=agent.system_prompt,
-                        prompt=self._render_prompt(step),
+                        prompt=self._render_prompt(step, loop_context),
                         permission=agent.permissions,
                         allowed_tools=agent.allowed_tools,
                         workspace=self._plan.workspace,
