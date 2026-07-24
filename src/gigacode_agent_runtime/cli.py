@@ -13,6 +13,7 @@ from pathlib import Path
 import anyio
 
 from .adapter_factory import create_gigacode_adapter
+from .catalog import create_scenario_catalog
 from .cli_format import (
     EXIT_INTERNAL,
     emit,
@@ -20,6 +21,7 @@ from .cli_format import (
     state_exit_code,
 )
 from .config import EffectiveConfig, load_config
+from .diagnostics import diagnose_runtime
 from .domain import RunStatus
 from .errors import AgentRuntimeError, ErrorCode
 from .event_log import EventLog, event_to_document
@@ -70,6 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     diagnose = subparsers.add_parser("diagnose")
+    diagnose.add_argument("--subprocess-smoke", action="store_true")
     _add_json(diagnose)
 
     scenarios = subparsers.add_parser("scenarios")
@@ -152,8 +155,8 @@ def _parse_inputs(values: Sequence[str]) -> dict[str, object]:
 
 def _catalog(config: EffectiveConfig) -> ScenarioCatalog:
     project = Path.cwd() / ".gigacode" / "scenarios"
-    return ScenarioCatalog(
-        user_dir=config.paths.user_scenarios,
+    return create_scenario_catalog(
+        config,
         project_dir=project,
         workspace_root=Path.cwd(),
     )
@@ -164,16 +167,6 @@ def _target_scenario(target: str, config: EffectiveConfig) -> LoadedScenario:
     if path.is_file():
         return load_scenario_file(path)
     return _catalog(config).load(target)
-
-
-async def _diagnose(config: EffectiveConfig) -> dict[str, object]:
-    adapter = create_gigacode_adapter(config)
-    capabilities = await adapter.detect_capabilities()
-    return {
-        "runtime_version": __version__,
-        "python": sys.version.split()[0],
-        "capabilities": capabilities.to_snapshot(),
-    }
 
 
 async def _run_foreground(
@@ -306,9 +299,16 @@ def _cancel_inactive(config: EffectiveConfig, run_id: str) -> dict[str, object]:
 def _execute(arguments: argparse.Namespace, config: EffectiveConfig) -> int:
     as_json = bool(getattr(arguments, "as_json", False))
     if arguments.command == "diagnose":
-        document = anyio.run(_diagnose, config)
+        document = anyio.run(
+            partial(
+                diagnose_runtime,
+                subprocess_smoke=arguments.subprocess_smoke,
+            ),
+            config,
+            partial(create_gigacode_adapter, config),
+        )
         emit(document, as_json=as_json)
-        return 0
+        return 0 if document["status"] != "error" else 2
     if arguments.command == "scenarios":
         entries = [
             {
@@ -316,7 +316,16 @@ def _execute(arguments: argparse.Namespace, config: EffectiveConfig) -> int:
                 "title": entry.title,
                 "source": entry.source.level,
             }
-            for entry in _catalog(config).discover().values()
+            for entry in sorted(
+                _catalog(config).discover().values(),
+                key=lambda entry: (
+                    {"project": 0, "user": 1, "builtin": 2}.get(
+                        entry.source.level,
+                        3,
+                    ),
+                    entry.name,
+                ),
+            )
         ]
         emit({"scenarios": entries}, as_json=as_json)
         return 0

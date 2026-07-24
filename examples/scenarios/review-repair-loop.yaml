@@ -1,0 +1,77 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: review-repair-loop
+  title: Bounded review and repair loop
+  description: Review a candidate and repair it until approved or a limit is reached.
+
+inputs:
+  task:
+    type: string
+    required: true
+
+agents:
+  reviewer:
+    model: REPLACE_WITH_GIGACODE_REVIEW_MODEL_ID
+    permissions: read_only
+    system_prompt: Review the current candidate against the task.
+  creator:
+    model: REPLACE_WITH_GIGACODE_MODEL_ID
+    permissions: propose_only
+    system_prompt: Repair the candidate using structured reviewer feedback.
+
+steps:
+  improve:
+    kind: loop
+    needs: []
+    max_iterations: 4
+    timeout_seconds: 1800
+    on_limit: pause
+    no_progress:
+      max_unchanged_iterations: 2
+      fingerprint:
+        - "${loop.steps.review.output.feedback}"
+    body:
+      steps:
+        review:
+          kind: agent
+          agent: reviewer
+          needs: []
+          prompt:
+            template: "Review iteration ${loop.iteration} for task: ${inputs.task}"
+          output_schema:
+            type: object
+            required: [approved, feedback]
+            properties:
+              approved:
+                type: boolean
+              feedback:
+                type: string
+            additionalProperties: false
+
+        repair:
+          kind: agent
+          agent: creator
+          needs: [review]
+          when:
+            ref: "${loop.steps.review.output.approved}"
+            op: eq
+            value: false
+          prompt:
+            template: "Repair ${inputs.task} using: ${loop.steps.review.output.feedback}"
+          output_schema:
+            type: object
+            required: [candidate]
+            properties:
+              candidate:
+                type: string
+            additionalProperties: false
+
+    until:
+      ref: "${loop.steps.review.output.approved}"
+      op: eq
+      value: true
+
+result:
+  from: "${steps.improve.output}"

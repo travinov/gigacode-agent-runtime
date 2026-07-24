@@ -53,6 +53,11 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
+"gigacode_agent_runtime" = [
+  "_catalog/prompts/*.md",
+  "_catalog/scenarios/*.yaml",
+  "_catalog/schemas/*.json",
+]
 "gigacode_agent_runtime.web" = ["static/*"]
 
 [tool.setuptools.data-files]

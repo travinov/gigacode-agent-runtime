@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import importlib.metadata
-import os
-import sys
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from .adapter_factory import create_gigacode_adapter
 from .approval_store import ApprovalStore
+from .catalog import create_scenario_catalog
 from .config import EffectiveConfig
+from .diagnostics import diagnose_runtime
 from .domain import RunStatus
 from .errors import AgentRuntimeError, ErrorCode
 from .event_log import EventLog, event_to_document
@@ -21,7 +20,7 @@ from .mcp_errors import public_result
 from .plan_compiler import compile_plan, execution_plan_to_document
 from .run_manager import RunManager
 from .runtime_service import RuntimeService
-from .scenario_loader import LoadedScenario, ScenarioCatalog, load_scenario_file
+from .scenario_loader import LoadedScenario, load_scenario_file
 from .scheduler import DagScheduler
 from .serialization import atomic_write_text
 from .state_store import StateStore, run_state_to_document
@@ -47,8 +46,8 @@ class McpToolService:
         self._manager = RunManager()
         self._started = False
         self._project_scenarios = project_scenarios
-        self._catalog = ScenarioCatalog(
-            user_dir=config.paths.user_scenarios,
+        self._catalog = create_scenario_catalog(
+            config,
             project_dir=project_scenarios,
             workspace_root=(
                 project_scenarios.parent if project_scenarios is not None else None
@@ -148,7 +147,17 @@ class McpToolService:
     async def list_scenarios(self) -> dict[str, object]:
         def operation() -> dict[str, object]:
             scenarios = []
-            for entry in self._catalog.discover().values():
+            entries = sorted(
+                self._catalog.discover().values(),
+                key=lambda entry: (
+                    {"project": 0, "user": 1, "builtin": 2}.get(
+                        entry.source.level,
+                        3,
+                    ),
+                    entry.name,
+                ),
+            )
+            for entry in entries:
                 metadata = cast(Mapping[str, Any], entry.scenario.document["metadata"])
                 scenarios.append(
                     {
@@ -223,22 +232,16 @@ class McpToolService:
 
         return await public_result(operation)
 
-    async def diagnose_runtime(self) -> dict[str, object]:
+    async def diagnose_runtime(
+        self,
+        subprocess_smoke: bool = False,
+    ) -> dict[str, object]:
         async def operation() -> dict[str, object]:
-            adapter = self._adapter_factory()
-            capabilities = await adapter.detect_capabilities()
-            return {
-                "runtime_version": importlib.metadata.version(
-                    "gigacode-agent-runtime"
-                ),
-                "mcp_sdk_version": importlib.metadata.version("mcp"),
-                "python": sys.version.split()[0],
-                "capabilities": capabilities.to_snapshot(),
-                "data_dir_writable": os.access(
-                    self.config.runtime.data_dir.parent,
-                    os.W_OK,
-                ),
-            }
+            return await diagnose_runtime(
+                self.config,
+                self._adapter_factory,
+                subprocess_smoke=subprocess_smoke,
+            )
 
         return await public_result(operation)
 

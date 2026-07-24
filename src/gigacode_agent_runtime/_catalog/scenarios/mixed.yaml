@@ -1,0 +1,69 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+metadata:
+  name: mixed
+  title: Sequential preparation, parallel work, final fan-in
+  description: Prepare once, run two branches in parallel, then consolidate.
+inputs:
+  task: {type: string, required: true}
+agents:
+  planner:
+    model: REPLACE_WITH_GIGACODE_MODEL_ID
+    permissions: read_only
+    system_prompt: Decompose a task into concrete questions.
+  specialist:
+    model: REPLACE_WITH_GIGACODE_MODEL_ID
+    permissions: read_only
+    system_prompt: Answer assigned questions with concise evidence.
+  reviewer:
+    model: REPLACE_WITH_GIGACODE_REVIEW_MODEL_ID
+    permissions: propose_only
+    system_prompt: Consolidate parallel specialist outputs.
+steps:
+  prepare:
+    kind: agent
+    agent: planner
+    needs: []
+    prompt: {template: "Prepare investigation questions for: ${inputs.task}"}
+    output_schema:
+      type: object
+      required: [questions]
+      properties: {questions: {type: array, items: {type: string}}}
+      additionalProperties: false
+  branch_a:
+    kind: agent
+    agent: specialist
+    needs: [prepare]
+    prompt: {template: "Answer from implementation perspective: ${steps.prepare.output.questions}"}
+    output_schema:
+      type: object
+      required: [answer]
+      properties: {answer: {type: string}}
+      additionalProperties: false
+  branch_b:
+    kind: agent
+    agent: specialist
+    needs: [prepare]
+    prompt: {template: "Answer from validation perspective: ${steps.prepare.output.questions}"}
+    output_schema:
+      type: object
+      required: [answer]
+      properties: {answer: {type: string}}
+      additionalProperties: false
+  consolidate:
+    kind: agent
+    agent: reviewer
+    needs: [branch_a, branch_b]
+    prompt:
+      template: >-
+        Consolidate implementation ${steps.branch_a.output.answer}
+        and validation ${steps.branch_b.output.answer}.
+    output_schema:
+      type: object
+      required: [summary, next_actions]
+      properties:
+        summary: {type: string}
+        next_actions: {type: array, items: {type: string}}
+      additionalProperties: false
+result:
+  from: "${steps.consolidate.output}"
