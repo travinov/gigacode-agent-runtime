@@ -8,7 +8,7 @@ Python 3.11–3.14. Установка не обращается к PyPI: ZIP с
 можно запустить одной командой:
 
 ```bash
-curl -fsSL https://github.com/travinov/gigacode-agent-runtime/releases/download/v1.0.0-rc.1/install.sh | sh
+curl -fsSL https://github.com/travinov/gigacode-agent-runtime/releases/download/v1.0.0-rc.2/install.sh | sh
 ```
 
 Этот bootstrap использует сеть только для получения release assets. После

@@ -40,7 +40,7 @@ heartbeat, события, результаты и артефакты.
 Онлайн-установка release candidate одной командой:
 
 ```bash
-curl -fsSL https://github.com/travinov/gigacode-agent-runtime/releases/download/v1.0.0-rc.1/install.sh | sh
+curl -fsSL https://github.com/travinov/gigacode-agent-runtime/releases/download/v1.0.0-rc.2/install.sh | sh
 ```
 
 Bootstrap поддерживает macOS 10.15+ `x86_64`, скачивает ZIP и `.sha256`,
