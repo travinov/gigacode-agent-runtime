@@ -149,3 +149,27 @@ class ArtifactStore:
             )
             atomic_write_json(self._manifest_path, manifest)
         return record
+
+    def list(
+        self,
+        *,
+        after: int = 0,
+        limit: int = 100,
+    ) -> dict[str, object]:
+        if after < 0 or not 1 <= limit <= 500:
+            raise AgentRuntimeError(
+                ErrorCode.CONFIG_INVALID,
+                "Artifact pagination is outside allowed bounds",
+                details={"after": after, "limit": limit},
+            )
+        with FileLock(self._lock_path, blocking=True):
+            manifest = self._load_manifest_unlocked()
+        raw_artifacts = manifest["artifacts"]
+        assert isinstance(raw_artifacts, list)
+        page = raw_artifacts[after : after + limit]
+        next_cursor = after + len(page)
+        return {
+            "artifacts": page,
+            "next_cursor": next_cursor,
+            "has_more": next_cursor < len(raw_artifacts),
+        }

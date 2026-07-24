@@ -26,7 +26,7 @@ class EventPage:
     has_more: bool
 
 
-def _event_to_document(event: RunEvent) -> dict[str, object]:
+def event_to_document(event: RunEvent) -> dict[str, object]:
     return {
         "schema_version": event.schema_version,
         "event_id": event.event_id,
@@ -96,7 +96,7 @@ class EventLog:
                 step_instance_id=step_instance_id,
                 payload=MappingProxyType(dict(payload)),
             )
-            document = _event_to_document(event)
+            document = event_to_document(event)
             validate_document("run-event-v1", document)
             self._path.parent.mkdir(parents=True, exist_ok=True)
             with self._path.open("a", encoding="utf-8") as handle:

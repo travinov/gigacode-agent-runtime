@@ -7,10 +7,12 @@ from dataclasses import dataclass
 import anyio
 
 from .cancellation import ExecutionControl
-from .domain import RunState
+from .domain import RunState, RunStatus
 from .errors import AgentRuntimeError, ErrorCode
+from .event_log import EventLog
 from .run_factory import PreparedRun
 from .scheduler import DagScheduler, SchedulerResult
+from .state_store import StateStore
 
 
 @dataclass(slots=True)
@@ -58,6 +60,35 @@ class RunManager:
             )
         except BaseException as error:
             managed.error = error
+            states = StateStore(prepared.run_dir.parent)
+            current = states.read(prepared.run_id)
+            if current.status.value in {
+                "planned",
+                "running",
+                "waiting_for_approval",
+                "paused",
+                "interrupted",
+            }:
+                public_error = (
+                    error.to_dict()
+                    if isinstance(error, AgentRuntimeError)
+                    else AgentRuntimeError(
+                        ErrorCode.INTERNAL_ERROR,
+                        "Run failed because of an internal runtime error",
+                    ).to_dict()
+                )
+                try:
+                    states.finish(
+                        prepared.run_id,
+                        target=RunStatus.FAILED,
+                        error=public_error,
+                    )
+                    EventLog(
+                        prepared.run_dir,
+                        run_id=prepared.run_id,
+                    ).append("run.failed", {"error": public_error})
+                except AgentRuntimeError:
+                    pass
         finally:
             managed.done.set()
 
@@ -71,8 +102,9 @@ class RunManager:
                 ErrorCode.INVALID_STATE_TRANSITION,
                 "RunManager is not accepting new runs",
             )
-        if prepared.run_id in self._runs:
-            return self._runs[prepared.run_id].control
+        existing = self._runs.get(prepared.run_id)
+        if existing is not None and not existing.done.is_set():
+            return existing.control
         managed = ManagedRun(
             run_id=prepared.run_id,
             control=ExecutionControl(),
@@ -96,6 +128,10 @@ class RunManager:
                 details={"run_id": run_id},
             )
         return managed.control
+
+    def has_active(self, run_id: str) -> bool:
+        managed = self._runs.get(run_id)
+        return managed is not None and not managed.done.is_set()
 
     async def wait(self, run_id: str) -> RunState:
         managed = self._runs.get(run_id)
