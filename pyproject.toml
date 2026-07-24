@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gigacode-agent-runtime"
+version = "0.1.0"
+description = "Local MCP runtime for declarative multi-agent GigaCode workflows"
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+license = { file = "LICENSE" }
+authors = [
+  { name = "GigaCode Agent Runtime contributors" },
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+  "anyio>=4.8,<5",
+  "jsonschema>=4.23,<5",
+  "mcp>=1.20,<2",
+  "PyYAML>=6.0,<7",
+  "starlette>=0.46,<2",
+  "uvicorn>=0.34,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2,<2",
+  "httpx>=0.28,<1",
+  "mypy>=1.15,<2",
+  "pytest>=8.3,<9",
+  "pytest-timeout>=2.3,<3",
+  "ruff>=0.11,<1",
+  "types-PyYAML>=6.0,<7",
+]
+
+[project.scripts]
+agent-runtime = "gigacode_agent_runtime.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gigacode_agent_runtime"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config"]
+markers = [
+  "corporate_acceptance: requires a real corporate GigaCode installation",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["gigacode_agent_runtime"]
