@@ -43,7 +43,8 @@ gigacode mcp list
 
 Откройте новый чат GigaCode и попросите вызвать `list_scenarios`, затем
 `diagnose_runtime`. Убедитесь, что доступны все 16 tools из `docs/mcp-api.md`,
-а ответы имеют envelope `ok/data` или `ok/error`.
+каждый tool имеет непустое описание, `/mcp` не показывает недействительные
+инструменты, а ответы имеют envelope `ok/data` или `ok/error`.
 
 ## 5. Подготовить безопасные сценарии
 

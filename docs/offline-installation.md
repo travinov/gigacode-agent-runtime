@@ -39,9 +39,11 @@ cd gigacode-agent-runtime-VERSION-macos-x86_64
 
 Корневой `install.sh` ничего не скачивает и передаёт управление штатному
 `installer/install-macos.sh`. Installer создаёт versioned runtime environment,
-создаёт Python `venv` сразу по окончательному versioned path, переключает
-атомарный `current` symlink и регистрирует локальный stdio MCP. При сбое до
-commit выполняется rollback.
+создаёт Python `venv` сразу по окончательному content-addressed versioned path,
+переключает атомарный `current` symlink и регистрирует локальный stdio MCP.
+Новая сборка с той же публичной версией получает отдельный path по SHA-256
+project wheel, поэтому release candidate можно безопасно обновлять с
+сохранением rollback. При сбое до commit выполняется rollback.
 
 После установки:
 

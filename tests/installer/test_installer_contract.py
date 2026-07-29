@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import os
 import subprocess
 from pathlib import Path
 
@@ -63,7 +65,8 @@ def test_failure_injection_rolls_back_every_stage(
     assert completed.returncode != 0
     assert not (install_root / "current").exists()
     assert not launcher.exists()
-    assert not (install_root / "versions" / "1.0.0").exists()
+    versions = install_root / "versions"
+    assert not versions.exists() or list(versions.iterdir()) == []
 
 
 def test_install_keeps_venv_at_created_path_and_is_idempotent(
@@ -83,18 +86,25 @@ def test_install_keeps_venv_at_created_path_and_is_idempotent(
     assert (install_root / "current").is_symlink()
     assert launcher.is_symlink()
     entrypoint = (
-        install_root / "versions" / "1.0.0" / "venv" / "bin" / "agent-runtime"
+        install_root / "current" / "venv" / "bin" / "agent-runtime"
     )
     assert entrypoint.is_file()
     assert ".install-1.0.0" not in entrypoint.read_text()
+    assert os.readlink(install_root / "current").startswith("versions/1.0.0-")
 
 
 def test_install_replaces_non_runnable_version_directory(tmp_path: Path) -> None:
     release, fake_python, fake_gigacode = synthetic_release(tmp_path)
     environment = installer_environment(tmp_path, fake_python, fake_gigacode)
     install_root = Path(environment["GIGACODE_AGENT_RUNTIME_INSTALL_ROOT"])
+    project_digest = hashlib.sha256(b"synthetic").hexdigest()
     entrypoint = (
-        install_root / "versions" / "1.0.0" / "venv" / "bin" / "agent-runtime"
+        install_root
+        / "versions"
+        / f"1.0.0-{project_digest}"
+        / "venv"
+        / "bin"
+        / "agent-runtime"
     )
     make_executable(entrypoint, "#!/bin/sh\nexit 126\n")
 
@@ -114,3 +124,31 @@ def test_install_replaces_non_runnable_version_directory(tmp_path: Path) -> None
     )
     assert version.returncode == 0, version.stderr
     assert version.stdout.strip() == "agent-runtime 1.0.0"
+
+
+def test_install_activates_new_project_wheel_and_preserves_rollback(
+    tmp_path: Path,
+) -> None:
+    release, fake_python, fake_gigacode = synthetic_release(tmp_path)
+    environment = installer_environment(tmp_path, fake_python, fake_gigacode)
+    command = ["sh", str(release / "installer" / "install-macos.sh")]
+    install_root = Path(environment["GIGACODE_AGENT_RUNTIME_INSTALL_ROOT"])
+
+    first = subprocess.run(command, env=environment, text=True, capture_output=True)
+    assert first.returncode == 0, first.stderr
+    first_target = os.readlink(install_root / "current")
+    project_wheel = next(
+        (release / "wheelhouse" / "common").glob(
+            "gigacode_agent_runtime-1.0.0-*.whl"
+        )
+    )
+    project_wheel.write_bytes(b"synthetic updated")
+
+    second = subprocess.run(command, env=environment, text=True, capture_output=True)
+    second_target = os.readlink(install_root / "current")
+
+    assert second.returncode == 0, second.stderr
+    assert second_target != first_target
+    assert (install_root / first_target).is_dir()
+    assert (install_root / second_target).is_dir()
+    assert (install_root / "previous-target").read_text().strip() == first_target

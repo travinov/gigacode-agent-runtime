@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.0-rc.5] - 2026-07-29
+
+### Fixed
+
+- Publish non-empty descriptions for all 16 MCP tools so GigaCode/Qwen CLI
+  accepts them as valid tools.
+- Use a content-addressed installation directory so a corrected release
+  candidate replaces an older build with the same public package version while
+  preserving atomic activation and rollback.
+
 ## [1.0.0-rc.4] - 2026-07-29
 
 ### Fixed

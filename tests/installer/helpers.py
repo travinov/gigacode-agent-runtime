@@ -36,7 +36,11 @@ def synthetic_release(tmp_path: Path) -> tuple[Path, Path, Path]:
         r"""#!/bin/sh
 set -eu
 if [ "${1:-}" = "-c" ]; then
-  echo 314
+  if [ "$#" -eq 2 ]; then
+    echo 314
+  else
+    /usr/bin/shasum -a 256 "$3" | /usr/bin/awk '{print $1}'
+  fi
   exit 0
 fi
 if [ "${1:-}" = "-m" ] && [ "${2:-}" = "venv" ]; then

@@ -10,6 +10,7 @@ ROLLBACK_REQUIRED=0
 PREVIOUS_TARGET=""
 ROLLBACK_TARGET=""
 GIGACODE=""
+VERSION_DIR=""
 
 rollback_failed_install() {
   if [ "$ROLLBACK_REQUIRED" -eq 1 ]; then
@@ -26,8 +27,8 @@ rollback_failed_install() {
       fi
     fi
   fi
-  if [ "$CREATED_VERSION" -eq 1 ]; then
-    gar_remove_tree "$GAR_INSTALL_ROOT/versions/$GAR_VERSION" "$GAR_INSTALL_ROOT/versions"
+  if [ "$CREATED_VERSION" -eq 1 ] && [ -n "$VERSION_DIR" ]; then
+    gar_remove_tree "$VERSION_DIR" "$GAR_INSTALL_ROOT/versions"
   fi
 }
 
@@ -49,9 +50,23 @@ GIGACODE=$(gar_find_gigacode)
 "$PYTHON" "$RELEASE_ROOT/scripts/release_tool.py" verify "$RELEASE_ROOT"
 gar_fail_after preflight
 
+PROJECT_WHEEL=$(
+  find "$RELEASE_ROOT/wheelhouse/common" -type f \
+    -name "gigacode_agent_runtime-$GAR_VERSION-*.whl" -print
+)
+if [ -z "$PROJECT_WHEEL" ] || \
+  [ "$(printf '%s\n' "$PROJECT_WHEEL" | wc -l | tr -d ' ')" -ne 1 ]; then
+  gar_die "expected exactly one project wheel"
+fi
+PROJECT_DIGEST=$(
+  "$PYTHON" -c \
+    'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' \
+    "$PROJECT_WHEEL"
+)
+
 mkdir -p "$GAR_INSTALL_ROOT/versions" "$GAR_BIN_DIR" \
   "$GAR_DATA_DIR/scenarios" "$GAR_DATA_DIR/runs"
-VERSION_TARGET="versions/$GAR_VERSION"
+VERSION_TARGET="versions/$GAR_VERSION-$PROJECT_DIGEST"
 VERSION_DIR="$GAR_INSTALL_ROOT/$VERSION_TARGET"
 PREVIOUS_TARGET=$(gar_read_current)
 ROLLBACK_TARGET=$PREVIOUS_TARGET
@@ -79,14 +94,6 @@ else
     --find-links "$RELEASE_ROOT/wheelhouse/py$PY_MINOR" \
     -r "$RELEASE_ROOT/requirements/runtime-py$PY_MINOR.lock"
 
-  PROJECT_WHEEL=$(
-    find "$RELEASE_ROOT/wheelhouse/common" -type f \
-      -name "gigacode_agent_runtime-$GAR_VERSION-*.whl" -print
-  )
-  if [ -z "$PROJECT_WHEEL" ] || \
-    [ "$(printf '%s\n' "$PROJECT_WHEEL" | wc -l | tr -d ' ')" -ne 1 ]; then
-    gar_die "expected exactly one project wheel"
-  fi
   "$VERSION_DIR/venv/bin/python" -m pip install \
     --no-index --no-deps "$PROJECT_WHEEL"
   "$VERSION_ENTRYPOINT" --version
