@@ -75,6 +75,30 @@ def test_model_allowlist_is_enforced(tmp_path: Path) -> None:
     assert captured.value.code is ErrorCode.MODEL_NOT_ALLOWED
 
 
+def test_placeholder_model_is_rejected_before_execution(tmp_path: Path) -> None:
+    source = (FIXTURES / "sequential-valid.yaml").read_text()
+    path = tmp_path / "placeholder.yaml"
+    path.write_text(
+        source.replace("code-model-id", "REPLACE_WITH_GIGACODE_MODEL_ID")
+    )
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        compile_plan(
+            load_scenario_file(path),
+            _config(tmp_path),
+            inputs={},
+            workspace=tmp_path,
+        )
+
+    assert captured.value.code is ErrorCode.MODEL_NOT_ALLOWED
+    assert captured.value.details == {
+        "agent": "creator",
+        "model": "REPLACE_WITH_GIGACODE_MODEL_ID",
+        "placeholder": True,
+    }
+    assert "placeholder" in captured.value.message
+
+
 def test_full_access_loop_is_capped_by_global_policy(tmp_path: Path) -> None:
     plan = compile_plan(
         load_scenario_file(FIXTURES / "full-access-loop.yaml"),

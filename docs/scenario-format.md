@@ -28,7 +28,9 @@ Runtime объединяет три read-only представления:
 
 Встроенные примеры используют `REPLACE_WITH_GIGACODE_MODEL_ID`, потому что
 доступные model ID различаются между корпоративными установками. Скопируйте
-пример в user/project catalog и замените placeholder до запуска.
+пример в user/project catalog и замените placeholder до запуска. Placeholder
+никогда не заменяется моделью по умолчанию: runtime отклоняет план с
+`MODEL_NOT_ALLOWED`.
 
 ## DAG и `needs`
 

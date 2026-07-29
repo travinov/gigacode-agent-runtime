@@ -12,7 +12,9 @@ subagent calls.
 ## Select the operation
 
 - Discover reusable scenarios with `list_scenarios` and
-  `describe_scenario`.
+  `describe_scenario`. The latter returns complete agent, step, dependency,
+  output-schema, and result definitions; use those definitions as the source of
+  truth instead of guessing YAML fields.
 - Accept a named catalog scenario or an inline scenario. Provide exactly one.
 - Use `diagnose_runtime` when GigaCode, MCP, Web UI, model selection, or local
   permissions appear unavailable.
@@ -31,6 +33,12 @@ subagent calls.
 Never skip validation or planning. Never claim that parallel execution occurs
 unless the plan places independent steps in the same wave.
 
+`idempotency_key` is not a `run_id`. Poll only the `run_id` returned by
+`start_run`. If the MCP connection times out before returning it, reconnect and
+repeat `start_run` with the identical scenario, inputs, workspace, and
+`idempotency_key`; the runtime returns the existing run. Do not assume the run
+was not created.
+
 ## Monitor and finish
 
 Poll `get_run_status` at a bounded cadence. Use `get_run_events` with its
@@ -48,6 +56,11 @@ Use `pause_run`, `resume_run`, or `cancel_run` only for the named `run_id`.
 After a disconnected MCP process, reconnect, inspect status, and resume an
 `interrupted` run instead of starting a duplicate.
 
+If validation fails, report the typed error and correct only the fields it
+identifies. Do not probe arbitrary YAML shapes. If the user restricted the task
+to this MCP server, never fall back to Shell, manual GigaCode subprocesses, or
+ad hoc subagents.
+
 ## Scenario guidance
 
 - Sequential: make each step depend on its predecessor through `needs`.
@@ -58,6 +71,65 @@ After a disconnected MCP process, reconnect, inspect status, and resume an
 - Models: require exact corporate GigaCode model IDs; do not invent them.
 - Full access: treat it as opt-in, verify the exact plan, and never imply root
   or a bypass of macOS or corporate controls.
+
+Scenario v1 uses this exact structure:
+
+```yaml
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+metadata:
+  name: creator-reviewer
+  title: Creator and reviewer
+inputs:
+  task:
+    type: string
+    required: true
+agents:
+  creator:
+    model: EXACT_GIGACODE_MODEL_ID
+    permissions: propose_only
+    system_prompt: Create a structured proposal.
+  reviewer:
+    model: EXACT_GIGACODE_REVIEW_MODEL_ID
+    permissions: read_only
+    system_prompt: Review the proposal.
+steps:
+  create:
+    kind: agent
+    agent: creator
+    needs: []
+    prompt:
+      template: "Create: ${inputs.task}"
+    output_schema:
+      type: object
+      required: [draft]
+      properties:
+        draft: {type: string}
+      additionalProperties: false
+  review:
+    kind: agent
+    agent: reviewer
+    needs: [create]
+    prompt:
+      template: "Review: ${steps.create.output.draft}"
+    output_schema:
+      type: object
+      required: [approved, feedback]
+      properties:
+        approved: {type: boolean}
+        feedback: {type: string}
+      additionalProperties: false
+result:
+  from: "${steps.review.output}"
+```
+
+- Put `output_schema` on each agent step, not in `agents`.
+- Define `steps` as a mapping keyed by step name, not as an array.
+- Set `kind: agent` or `kind: loop`; v1 has no other step kinds.
+- Use `needs`, not `depends_on`.
+- Use `${...}`, not `{{ ... }}`.
+- A model beginning with `REPLACE_WITH_` or another placeholder is not a
+  runnable model and is never replaced automatically.
 
 If the MCP runtime is unavailable, report the diagnostic error and recovery
 step. Do not fall back to an ad hoc multi-agent implementation.

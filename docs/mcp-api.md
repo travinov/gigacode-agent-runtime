@@ -17,7 +17,7 @@
 | Tool | Основные arguments | Назначение |
 |---|---|---|
 | `list_scenarios` | — | builtin/user/project catalog |
-| `describe_scenario` | `scenario_name` | metadata, inputs, agents и steps |
+| `describe_scenario` | `scenario_name` | полный scenario contract: metadata, inputs, agents, step definitions, dependencies, output schemas и result |
 | `validate_scenario` | ровно один из `scenario_name`, `inline_scenario` | schema validation |
 | `plan_scenario` | `workspace`, scenario, `inputs` | неизменяемый ExecutionPlan |
 | `diagnose_runtime` | `subprocess_smoke=false` | structured local diagnostics |
@@ -40,6 +40,11 @@
 
 `start_run` с одинаковым `idempotency_key` и теми же параметрами возвращает тот
 же run. Повтор ключа с другим plan создаёт `IDEMPOTENCY_CONFLICT`.
+`idempotency_key` не является `run_id`.
+
+Если клиентский timeout произошёл до получения ответа `start_run`, после
+переподключения повторите тот же вызов с теми же scenario, inputs, workspace и
+`idempotency_key`. Не передавайте idempotency key в `get_run_status`.
 
 ## Gates и UI
 

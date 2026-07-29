@@ -121,6 +121,16 @@ def _compile_agents(
     for name in sorted(raw_agents):
         raw = raw_agents[name]
         model = str(raw["model"])
+        if model.startswith("REPLACE_WITH_"):
+            raise AgentRuntimeError(
+                ErrorCode.MODEL_NOT_ALLOWED,
+                f"Agent '{name}' still uses a placeholder model ID: {model}",
+                details={
+                    "agent": name,
+                    "model": model,
+                    "placeholder": True,
+                },
+            )
         if allowed_models and model not in allowed_models:
             raise AgentRuntimeError(
                 ErrorCode.MODEL_NOT_ALLOWED,

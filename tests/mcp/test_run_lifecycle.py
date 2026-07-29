@@ -53,6 +53,35 @@ async def test_start_returns_immediately_then_polling_gets_result_and_events(
 
 
 @pytest.mark.anyio
+async def test_start_prepares_dashboard_before_background_execution(
+    tmp_path: Path,
+) -> None:
+    config = scheduler_config(tmp_path)
+    tools: McpToolService
+
+    def dashboard_url(run_id: str | None) -> str:
+        assert run_id is not None
+        assert tools._manager.has_active(run_id) is False
+        return f"http://127.0.0.1/dashboard?run={run_id}"
+
+    tools = McpToolService(
+        config,
+        adapter_factory=lambda: scheduler_adapter(tmp_path, "success"),
+        dashboard_url=dashboard_url,
+    )
+
+    async with tools:
+        started = await tools.start_run(
+            inline_scenario=(SCENARIOS / "sequential-valid.yaml").read_text(),
+            workspace=str(tmp_path),
+            idempotency_key="dashboard-before-scheduler",
+        )
+        run_id = started["data"]["run_id"]
+        assert started["data"]["dashboard_url"].endswith(f"run={run_id}")
+        await wait_for_status(tools, run_id, {"completed"})
+
+
+@pytest.mark.anyio
 async def test_approval_resume_and_cancel_are_process_local_controls(
     tmp_path: Path,
 ) -> None:

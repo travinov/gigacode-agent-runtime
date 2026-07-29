@@ -17,7 +17,9 @@ TOOL_DESCRIPTIONS = {
         "List the built-in, user, and project agent scenarios available to run."
     ),
     "describe_scenario": (
-        "Return metadata, inputs, agents, and step names for one scenario."
+        "Return the complete declarative contract for one named scenario, "
+        "including agents, full step definitions, dependencies, output schemas, "
+        "and result."
     ),
     "validate_scenario": (
         "Validate a named or inline agent scenario without executing it."

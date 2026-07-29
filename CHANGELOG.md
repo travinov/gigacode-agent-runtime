@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.0-rc.6] - 2026-07-29
+
+### Changed
+
+- Expand the README into a sequential corporate installation and configuration
+  guide with complete agent, model, scenario, step, loop, and MCP examples.
+
+### Fixed
+
+- Return complete step definitions from `describe_scenario` so an MCP client
+  can reuse the exact scenario-v1 contract instead of guessing YAML fields.
+- Report actionable missing fields for incomplete `agent` and `loop` steps.
+- Reject `REPLACE_WITH_*` model placeholders during planning instead of
+  forwarding them to GigaCode CLI.
+- Prepare the dashboard before submitting background agent execution so
+  `start_run` can return its run ID without yielding to child execution first.
+- Teach the optional Skill to preserve MCP-only scope, distinguish
+  `idempotency_key` from `run_id`, and recover safely after a client timeout.
+
 ## [1.0.0-rc.5] - 2026-07-29
 
 ### Fixed

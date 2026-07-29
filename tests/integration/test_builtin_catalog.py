@@ -3,10 +3,13 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+import pytest
+
 from gigacode_agent_runtime.catalog import (
     builtin_scenarios_dir,
     create_scenario_catalog,
 )
+from gigacode_agent_runtime.errors import AgentRuntimeError, ErrorCode
 from gigacode_agent_runtime.plan_compiler import compile_plan
 from gigacode_agent_runtime.scenario_loader import load_scenario_file
 from tests.helpers.scheduler import scheduler_config
@@ -16,7 +19,9 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def test_all_builtin_scenarios_validate_and_compile(tmp_path: Path) -> None:
+def test_all_builtin_scenarios_validate_but_require_model_configuration(
+    tmp_path: Path,
+) -> None:
     config = scheduler_config(tmp_path)
     catalog = create_scenario_catalog(config)
     entries = catalog.discover()
@@ -28,18 +33,16 @@ def test_all_builtin_scenarios_validate_and_compile(tmp_path: Path) -> None:
         "sequential",
     }
     for entry in entries.values():
-        plan = compile_plan(
-            entry.scenario,
-            config,
-            inputs={"task": "catalog smoke"},
-            workspace=tmp_path,
-        )
-        assert plan.source.level == "builtin"
-        assert plan.waves
-        assert all(
-            agent.model.startswith("REPLACE_WITH_")
-            for agent in plan.agents.values()
-        )
+        assert entry.scenario.source.level == "builtin"
+        with pytest.raises(AgentRuntimeError) as captured:
+            compile_plan(
+                entry.scenario,
+                config,
+                inputs={"task": "catalog smoke"},
+                workspace=tmp_path,
+            )
+        assert captured.value.code is ErrorCode.MODEL_NOT_ALLOWED
+        assert captured.value.details["placeholder"] is True
 
 
 def test_project_override_does_not_modify_builtin_file(tmp_path: Path) -> None:

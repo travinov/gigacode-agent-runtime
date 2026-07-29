@@ -42,14 +42,18 @@ gigacode mcp list
 ## 4. Проверить MCP discovery
 
 Откройте новый чат GigaCode и попросите вызвать `list_scenarios`, затем
-`diagnose_runtime`. Убедитесь, что доступны все 16 tools из `docs/mcp-api.md`,
-каждый tool имеет непустое описание, `/mcp` не показывает недействительные
-инструменты, а ответы имеют envelope `ok/data` или `ok/error`.
+`describe_scenario` для `sequential`, затем `diagnose_runtime`. Убедитесь, что
+доступны все 16 tools из `docs/mcp-api.md`, каждый tool имеет непустое описание,
+`/mcp` не показывает недействительные инструменты, `describe_scenario`
+возвращает полные поля `kind`, `needs`, `prompt` и `output_schema`, а ответы
+имеют envelope `ok/data` или `ok/error`.
 
 ## 5. Подготовить безопасные сценарии
 
-Скопируйте два примера в пользовательский каталог и замените только placeholder
-model ID на реальные разрешённые ID:
+Скопируйте два примера в пользовательский каталог и замените placeholder model
+ID на реальные разрешённые ID. Не запускайте встроенные сценарии напрямую:
+placeholder не заменяется автоматически и должен получить
+`MODEL_NOT_ALLOWED`.
 
 ```bash
 mkdir -p "$HOME/.gigacode/agent-runtime/scenarios"
@@ -82,6 +86,10 @@ agent-runtime scenario validate \
 Для parallel дополнительно вызовите `open_dashboard`. В Web UI обе ветви первой
 wave должны работать одновременно, а synthesize — стартовать после обеих.
 Зафиксируйте run IDs и screenshot без корпоративных данных.
+
+Если `start_run` получил клиентский timeout до ответа, переподключите MCP и
+повторите идентичный вызов с тем же `idempotency_key`. Используйте возвращённый
+`run_id`; сам idempotency key не является run ID. Не переходите к Shell.
 
 ## 7. Interruption и resume
 

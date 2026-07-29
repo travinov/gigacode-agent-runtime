@@ -35,6 +35,24 @@ state, лимиты и permission gates.
 
 Замените `REPLACE_WITH_GIGACODE_*` на точный корпоративный model ID. Если
 настроен `gigacode.model_allowlist`, model должен присутствовать и там.
+Placeholder не подставляется автоматически и отклоняется во время
+`plan_scenario`.
+
+## Timeout ответа `start_run`
+
+Клиентский timeout не доказывает, что run не был сохранён.
+
+1. Переподключите MCP.
+2. Повторите `start_run` с идентичными scenario, inputs, workspace и
+   `idempotency_key`.
+3. Возьмите возвращённый `run_id`.
+4. Только после этого вызывайте `get_run_status` и `get_run_events`.
+
+`idempotency_key` не является `run_id`. Если повторный вызов использует другой
+план, runtime вернёт `IDEMPOTENCY_CONFLICT`.
+
+Если пользователь потребовал использовать только MCP, не переходите к Shell,
+ручному запуску GigaCode или ad hoc subagents.
 
 ## Waiting for approval
 

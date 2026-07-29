@@ -174,8 +174,12 @@ class McpToolService:
     async def describe_scenario(self, scenario_name: str) -> dict[str, object]:
         def operation() -> dict[str, object]:
             scenario = self._catalog.load(scenario_name)
+            steps = cast(Mapping[str, object], scenario.document["steps"])
             return {
                 "name": scenario.name,
+                "schema_version": str(scenario.document["schema_version"]),
+                "kind": str(scenario.document["kind"]),
+                "source_level": scenario.source.level,
                 "metadata": dict(
                     cast(Mapping[str, object], scenario.document["metadata"])
                 ),
@@ -185,8 +189,13 @@ class McpToolService:
                 "agents": dict(
                     cast(Mapping[str, object], scenario.document["agents"])
                 ),
-                "steps": list(
-                    cast(Mapping[str, object], scenario.document["steps"]).keys()
+                "step_names": list(steps.keys()),
+                "steps": dict(steps),
+                "max_parallel_agents": scenario.document.get(
+                    "max_parallel_agents",
+                ),
+                "result": dict(
+                    cast(Mapping[str, object], scenario.document["result"])
                 ),
             }
 
@@ -265,6 +274,11 @@ class McpToolService:
                 workspace=self._workspace(workspace),
                 idempotency_key=idempotency_key,
             )
+            dashboard_url = (
+                await self._ensure_dashboard(prepared.run_id)
+                if self.config.web.enabled
+                else None
+            )
             if (
                 prepared.state.status is RunStatus.PLANNED
                 or self._manager.has_active(prepared.run_id)
@@ -273,11 +287,6 @@ class McpToolService:
                     prepared,
                     DagScheduler(prepared.config, self._adapter_factory()),
                 )
-            dashboard_url = (
-                await self._ensure_dashboard(prepared.run_id)
-                if self.config.web.enabled
-                else None
-            )
             return {
                 "run_id": prepared.run_id,
                 "status": prepared.state.status.value,

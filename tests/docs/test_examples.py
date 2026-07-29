@@ -3,7 +3,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 from gigacode_agent_runtime.config import load_config
+from gigacode_agent_runtime.errors import AgentRuntimeError, ErrorCode
 from gigacode_agent_runtime.plan_compiler import compile_plan
 from gigacode_agent_runtime.scenario_loader import load_scenario_file
 
@@ -15,20 +18,24 @@ PUBLIC_DOCS = (
 )
 
 
-def test_all_published_scenario_examples_validate_and_plan(tmp_path: Path) -> None:
+def test_all_published_scenario_examples_validate_but_require_models(
+    tmp_path: Path,
+) -> None:
     config = load_config(home=tmp_path / "home")
     scenarios = sorted((ROOT / "examples" / "scenarios").glob("*.yaml"))
 
     assert len(scenarios) == 4
     for path in scenarios:
         scenario = load_scenario_file(path)
-        plan = compile_plan(
-            scenario,
-            config,
-            inputs={"task": "documentation test"},
-            workspace=tmp_path,
-        )
-        assert plan.waves
+        with pytest.raises(AgentRuntimeError) as captured:
+            compile_plan(
+                scenario,
+                config,
+                inputs={"task": "documentation test"},
+                workspace=tmp_path,
+            )
+        assert captured.value.code is ErrorCode.MODEL_NOT_ALLOWED
+        assert captured.value.details["placeholder"] is True
 
 
 def test_public_docs_have_no_personal_paths_or_assignment_secrets() -> None:

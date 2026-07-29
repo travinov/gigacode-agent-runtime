@@ -39,6 +39,43 @@ def test_unknown_key_has_stable_error_path() -> None:
     assert "unsupported" in captured.value.message
 
 
+def test_incomplete_agent_step_reports_actionable_missing_fields() -> None:
+    document = yaml.safe_load(
+        """
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+metadata: {name: incomplete, title: Incomplete}
+agents:
+  creator:
+    model: code-model
+    permissions: propose_only
+    system_prompt: Create.
+steps:
+  create:
+    agent: creator
+    prompt: {template: Create.}
+result:
+  from: "${steps.create.output}"
+"""
+    )
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        validate_document("scenario-v1", document)
+
+    assert captured.value.code is ErrorCode.SCENARIO_INVALID
+    assert captured.value.details["path"] == "/steps/create"
+    assert captured.value.details["expected_kind"] == "agent"
+    assert captured.value.details["missing"] == [
+        "kind",
+        "needs",
+        "output_schema",
+    ]
+    assert captured.value.message == (
+        "Invalid agent step; missing required properties: "
+        "kind, needs, output_schema"
+    )
+
+
 def test_schema_result_is_not_shared_mutable_state() -> None:
     first = load_schema("scenario-v1")
     first["title"] = "mutated"
