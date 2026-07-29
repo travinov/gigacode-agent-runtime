@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.0-rc.4] - 2026-07-29
+
+### Fixed
+
+- Create the macOS installer virtual environment at its final versioned path so
+  Python console-script interpreter paths remain valid after installation.
+- Rebuild an existing version directory when its `agent-runtime` entrypoint is
+  present but cannot run.
+
 ## [1.0.0] - 2026-07-24
 
 ### Added

@@ -33,7 +33,7 @@ def synthetic_release(tmp_path: Path) -> tuple[Path, Path, Path]:
     fake_python = tmp_path / "tools with spaces" / "python3.14"
     make_executable(
         fake_python,
-        """#!/bin/sh
+        r"""#!/bin/sh
 set -eu
 if [ "${1:-}" = "-c" ]; then
   echo 314
@@ -43,9 +43,15 @@ if [ "${1:-}" = "-m" ] && [ "${2:-}" = "venv" ]; then
   target=$3
   mkdir -p "$target/bin"
   cp "$0" "$target/bin/python"
-  cat > "$target/bin/agent-runtime" <<'EOF'
+  cat > "$target/bin/agent-runtime" <<EOF
 #!/bin/sh
-case "${1:-}" in
+set -eu
+venv_python='$target/bin/python'
+if [ ! -x "\$venv_python" ]; then
+  echo "bad interpreter: \$venv_python: No such file or directory" >&2
+  exit 126
+fi
+case "\${1:-}" in
   --version) echo "agent-runtime 1.0.0" ;;
   diagnose) echo '{"status":"ok","checks":[]}' ;;
   mcp-serve) exit 0 ;;

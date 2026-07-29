@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from tests.installer.helpers import installer_environment, synthetic_release
+from tests.installer.helpers import (
+    installer_environment,
+    make_executable,
+    synthetic_release,
+)
 
 ROOT = Path(__file__).parents[2]
 
@@ -62,7 +66,9 @@ def test_failure_injection_rolls_back_every_stage(
     assert not (install_root / "versions" / "1.0.0").exists()
 
 
-def test_install_is_idempotent_and_supports_spaces(tmp_path: Path) -> None:
+def test_install_keeps_venv_at_created_path_and_is_idempotent(
+    tmp_path: Path,
+) -> None:
     release, fake_python, fake_gigacode = synthetic_release(tmp_path)
     environment = installer_environment(tmp_path, fake_python, fake_gigacode)
     command = ["sh", str(release / "installer" / "install-macos.sh")]
@@ -76,6 +82,35 @@ def test_install_is_idempotent_and_supports_spaces(tmp_path: Path) -> None:
     assert second.returncode == 0, second.stderr
     assert (install_root / "current").is_symlink()
     assert launcher.is_symlink()
-    assert (
+    entrypoint = (
         install_root / "versions" / "1.0.0" / "venv" / "bin" / "agent-runtime"
-    ).is_file()
+    )
+    assert entrypoint.is_file()
+    assert ".install-1.0.0" not in entrypoint.read_text()
+
+
+def test_install_replaces_non_runnable_version_directory(tmp_path: Path) -> None:
+    release, fake_python, fake_gigacode = synthetic_release(tmp_path)
+    environment = installer_environment(tmp_path, fake_python, fake_gigacode)
+    install_root = Path(environment["GIGACODE_AGENT_RUNTIME_INSTALL_ROOT"])
+    entrypoint = (
+        install_root / "versions" / "1.0.0" / "venv" / "bin" / "agent-runtime"
+    )
+    make_executable(entrypoint, "#!/bin/sh\nexit 126\n")
+
+    completed = subprocess.run(
+        ["sh", str(release / "installer" / "install-macos.sh")],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    version = subprocess.run(
+        [str(entrypoint), "--version"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert version.returncode == 0, version.stderr
+    assert version.stdout.strip() == "agent-runtime 1.0.0"
