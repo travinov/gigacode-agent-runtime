@@ -42,44 +42,48 @@ gigacode mcp list
 ## 4. Проверить MCP discovery
 
 Откройте новый чат GigaCode и попросите вызвать `list_scenarios`, затем
-`describe_scenario` для `sequential`, затем `diagnose_runtime`. Убедитесь, что
+`describe_scenario` для `corporate-sequential`, затем `diagnose_runtime`.
+Убедитесь, что
 доступны все 16 tools из `docs/mcp-api.md`, каждый tool имеет непустое описание,
 `/mcp` не показывает недействительные инструменты, `describe_scenario`
 возвращает полные поля `kind`, `needs`, `prompt` и `output_schema`, а ответы
 имеют envelope `ok/data` или `ok/error`.
 
-## 5. Подготовить безопасные сценарии
+## 5. Проверить автоматически установленный профиль
 
-Скопируйте два примера в пользовательский каталог и замените placeholder model
-ID на реальные разрешённые ID. Не запускайте встроенные сценарии напрямую:
-placeholder не заменяется автоматически и должен получить
-`MODEL_NOT_ALLOWED`.
+Installer должен уже положить конфигурацию и готовые сценарии в user catalog:
 
 ```bash
-mkdir -p "$HOME/.gigacode/agent-runtime/scenarios"
-cp examples/scenarios/sequential.yaml \
-  "$HOME/.gigacode/agent-runtime/scenarios/acceptance-sequential.yaml"
-cp examples/scenarios/parallel.yaml \
-  "$HOME/.gigacode/agent-runtime/scenarios/acceptance-parallel.yaml"
+test -f "$HOME/.gigacode/agent-runtime/config.yaml"
+ls "$HOME/.gigacode/agent-runtime/scenarios"/corporate-*.yaml
 ```
 
-Проверьте файлы до запуска:
+Проверьте готовые файлы без копирования или редактирования:
 
 ```bash
 agent-runtime scenario validate \
-  "$HOME/.gigacode/agent-runtime/scenarios/acceptance-sequential.yaml" --json
+  "$HOME/.gigacode/agent-runtime/scenarios/corporate-sequential.yaml" --json
 agent-runtime scenario validate \
-  "$HOME/.gigacode/agent-runtime/scenarios/acceptance-parallel.yaml" --json
+  "$HOME/.gigacode/agent-runtime/scenarios/corporate-parallel.yaml" --json
 ```
+
+В `/model` должны присутствовать:
+
+- `vllm/Qwen3.6-35B-262k`;
+- `vllm/DeepSeek-V4-Flash-262k`;
+- `vllm/MiniMax-M3-161k`;
+- `GigaChat-3.1-Ultra-128k`.
 
 ## 6. Sequential и parallel через MCP
 
-В GigaCode для каждого сценария потребуйте точную цепочку:
+В GigaCode запустите `corporate-sequential`, затем `corporate-parallel`.
+Для каждого сценария потребуйте точную цепочку:
 
 1. `validate_scenario`;
-2. `plan_scenario` с временным workspace;
+2. `plan_scenario` с временным workspace и
+   `inputs_yaml: "task: Проверить локальный MCP runtime"`;
 3. показать waves, модели, permissions и `plan_hash`;
-4. `start_run`;
+4. `start_run` с тем же `inputs_yaml`;
 5. дождаться terminal status через `get_run_status`;
 6. получить `get_run_events` и `get_run_result`.
 
@@ -87,9 +91,14 @@ agent-runtime scenario validate \
 wave должны работать одновременно, а synthesize — стартовать после обеих.
 Зафиксируйте run IDs и screenshot без корпоративных данных.
 
+Не используйте MCP-параметр `inputs`: wire-контракт GigaCode/Qwen принимает
+значения сценария через строковый `inputs_yaml`. Не кодируйте JSON object
+строкой. Для inline-сценария используется `inline_scenario_yaml` с YAML-текстом.
+
 Если `start_run` получил клиентский timeout до ответа, переподключите MCP и
-повторите идентичный вызов с тем же `idempotency_key`. Используйте возвращённый
-`run_id`; сам idempotency key не является run ID. Не переходите к Shell.
+повторите идентичный вызов с теми же `inputs_yaml` и `idempotency_key`.
+Используйте возвращённый `run_id`; сам idempotency key не является run ID. Не
+переходите к Shell.
 
 ## 7. Interruption и resume
 

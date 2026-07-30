@@ -1,0 +1,41 @@
+schema_version: gigacode-agent-runtime/config-v1
+
+runtime:
+  data_dir: ~/.gigacode/agent-runtime
+  max_parallel_agents: 4
+  default_step_timeout_seconds: 900
+  graceful_cancel_seconds: 10
+  max_stdout_bytes_per_step: 52428800
+  max_stderr_bytes_per_step: 10485760
+
+gigacode:
+  executable: auto
+  model_allowlist:
+    - vllm/Qwen3.6-35B-262k
+    - vllm/DeepSeek-V4-Flash-262k
+    - vllm/MiniMax-M3-161k
+    - GigaChat-3.1-Ultra-128k
+  environment_allowlist:
+    - PATH
+    - HOME
+    - LANG
+    - LC_ALL
+    - SSL_CERT_FILE
+    - REQUESTS_CA_BUNDLE
+    - HTTPS_PROXY
+    - HTTP_PROXY
+    - NO_PROXY
+
+permissions:
+  default: read_only
+  allow_full_access: true
+  require_full_access_confirmation: true
+  max_parallel_full_access_agents: 1
+  max_full_access_loop_iterations: 3
+  trusted_scenario_hashes: {}
+
+web:
+  enabled: true
+  host: 127.0.0.1
+  port: auto
+  open_automatically: false

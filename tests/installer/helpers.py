@@ -17,6 +17,7 @@ def make_executable(path: Path, content: str) -> None:
 def synthetic_release(tmp_path: Path) -> tuple[Path, Path, Path]:
     release = tmp_path / "release with spaces"
     shutil.copytree(ROOT / "installer", release / "installer")
+    shutil.copytree(ROOT / "corporate-profile", release / "corporate-profile")
     (release / "scripts").mkdir(parents=True)
     (release / "scripts" / "release_tool.py").write_text("# synthetic\n")
     for minor in ("311", "312", "313", "314"):

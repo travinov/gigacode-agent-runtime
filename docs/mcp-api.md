@@ -18,18 +18,26 @@
 |---|---|---|
 | `list_scenarios` | — | builtin/user/project catalog |
 | `describe_scenario` | `scenario_name` | полный scenario contract: metadata, inputs, agents, step definitions, dependencies, output schemas и result |
-| `validate_scenario` | ровно один из `scenario_name`, `inline_scenario` | schema validation |
-| `plan_scenario` | `workspace`, scenario, `inputs` | неизменяемый ExecutionPlan |
+| `validate_scenario` | ровно один из `scenario_name`, `inline_scenario_yaml` | schema validation |
+| `plan_scenario` | `workspace`, scenario, `inputs_yaml` | неизменяемый ExecutionPlan |
 | `diagnose_runtime` | `subprocess_smoke=false` | structured local diagnostics |
 
-`inline_scenario` ограничен 2 MiB. `workspace` должен существовать и быть
-каталогом.
+`inline_scenario_yaml` и `inputs_yaml` ограничены 2 MiB. `workspace` должен
+существовать и быть каталогом. Оба параметра являются строками с YAML, а не
+вложенными JSON objects:
+
+```yaml
+task: Проверить локальный MCP runtime
+```
+
+Не передавайте `inputs` и не кодируйте JSON object строкой. Это однозначный
+wire-контракт для GigaCode/Qwen CLI.
 
 ## Lifecycle
 
 | Tool | Основные arguments | Назначение |
 |---|---|---|
-| `start_run` | `workspace`, scenario, `inputs`, `idempotency_key` | создать и асинхронно запустить |
+| `start_run` | `workspace`, scenario, `inputs_yaml`, `idempotency_key` | создать и асинхронно запустить |
 | `get_run_status` | `run_id` | состояние, steps и blocker |
 | `get_run_events` | `run_id`, `after=0`, `limit=100` | cursor-based events |
 | `get_run_result` | `run_id` | итог terminal run |
@@ -43,8 +51,9 @@
 `idempotency_key` не является `run_id`.
 
 Если клиентский timeout произошёл до получения ответа `start_run`, после
-переподключения повторите тот же вызов с теми же scenario, inputs, workspace и
-`idempotency_key`. Не передавайте idempotency key в `get_run_status`.
+переподключения повторите тот же вызов с теми же scenario, `inputs_yaml`,
+workspace и `idempotency_key`. Не передавайте idempotency key в
+`get_run_status`.
 
 ## Gates и UI
 

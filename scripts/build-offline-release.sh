@@ -54,6 +54,7 @@ for MINOR in 311 312 313 314; do
 done
 
 cp -R "$PROJECT_ROOT/installer" "$STAGE_ROOT/installer"
+cp -R "$PROJECT_ROOT/corporate-profile" "$STAGE_ROOT/corporate-profile"
 cp -R "$PROJECT_ROOT/examples" "$STAGE_ROOT/examples"
 cp -R "$PROJECT_ROOT/docs" "$STAGE_ROOT/docs"
 cp -R "$PROJECT_ROOT/optional-skill" "$STAGE_ROOT/optional-skill"

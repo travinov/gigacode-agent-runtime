@@ -89,10 +89,10 @@ async def test_real_stdio_mcp_runs_parallel_dag_with_clean_protocol(
             started = await session.call_tool(
                 "start_run",
                 arguments={
-                    "inline_scenario": (
+                    "inline_scenario_yaml": (
                         SCENARIOS / "parallel-valid.yaml"
                     ).read_text(encoding="utf-8"),
-                    "inputs": {"task": "release acceptance"},
+                    "inputs_yaml": "task: release acceptance\n",
                     "workspace": str(tmp_path),
                     "idempotency_key": "acceptance-parallel",
                 },

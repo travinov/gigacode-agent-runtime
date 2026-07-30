@@ -1,0 +1,84 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: corporate-review-repair-loop
+  title: Corporate bounded review and repair loop
+  description: Review and repair until approved or a bounded limit is reached.
+
+inputs:
+  task:
+    type: string
+    required: true
+    description: Safe task for loop acceptance.
+
+agents:
+  reviewer:
+    model: vllm/DeepSeek-V4-Flash-262k
+    permissions: read_only
+    system_prompt: |
+      Проверь текущую итерацию задачи. Верни approved и конкретный feedback.
+
+  creator:
+    model: vllm/Qwen3.6-35B-262k
+    permissions: propose_only
+    system_prompt: |
+      Исправь решение по feedback. Верни только JSON по output_schema.
+
+steps:
+  improve:
+    kind: loop
+    needs: []
+    max_iterations: 4
+    timeout_seconds: 1800
+    on_limit: pause
+    no_progress:
+      max_unchanged_iterations: 2
+      fingerprint:
+        - "${loop.steps.review.output.feedback}"
+    body:
+      steps:
+        review:
+          kind: agent
+          agent: reviewer
+          needs: []
+          prompt:
+            template: |
+              Проверь итерацию ${loop.iteration} для задачи: ${inputs.task}
+          output_schema:
+            type: object
+            required: [approved, feedback]
+            properties:
+              approved:
+                type: boolean
+              feedback:
+                type: string
+            additionalProperties: false
+
+        repair:
+          kind: agent
+          agent: creator
+          needs: [review]
+          when:
+            ref: "${loop.steps.review.output.approved}"
+            op: eq
+            value: false
+          prompt:
+            template: |
+              Исправь решение задачи "${inputs.task}" по замечанию:
+              ${loop.steps.review.output.feedback}
+          output_schema:
+            type: object
+            required: [candidate]
+            properties:
+              candidate:
+                type: string
+            additionalProperties: false
+
+    until:
+      ref: "${loop.steps.review.output.approved}"
+      op: eq
+      value: true
+
+result:
+  from: "${steps.improve.output}"

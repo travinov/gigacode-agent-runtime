@@ -34,9 +34,9 @@ GIGACODE_AGENT_RUNTIME_RELEASE_ZIP="$PWD/dist/gigacode-agent-runtime-v1.0.0-maco
 | retry и loop имеют отдельные counters | `test_retry.py`, loop integration tests |
 | resume не повторяет completed | `test_resume.py` |
 | full access имеет global и exact-plan gates | `test_permissions.py` |
-| MCP stdout — только protocol | real `ClientSession` в `test_end_to_end_fake.py` |
+| MCP stdout — только protocol, Qwen wire использует YAML strings | real `ClientSession` в `test_end_to_end_fake.py`, MCP schema tests |
 | Web auth, SSE, status и control | `tests/web/` и headed browser smoke |
-| installer не использует package index | installer contract и ZIP resolution test |
+| installer не использует package index и атомарно размещает corporate profile | installer contract и ZIP resolution test |
 | rollback/uninstall сохраняют согласованность | `tests/installer/` |
 
 ## Артефакты

@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.0-rc.7] - 2026-07-30
+
+### Added
+
+- Install a non-destructive corporate profile with ready-to-run sequential,
+  parallel, mixed, and review-repair scenarios using the verified GigaCode
+  model IDs.
+- Seed `~/.gigacode/agent-runtime/config.yaml` with the four approved models,
+  bounded parallelism, local Web UI, and confirmation-gated full access when no
+  user configuration exists.
+
+### Fixed
+
+- Replace the ambiguous MCP `inputs` object with Qwen-compatible
+  `inputs_yaml` text for `plan_scenario` and `start_run`.
+- Replace `inline_scenario` with `inline_scenario_yaml` and explicitly require
+  YAML text so the GigaCode tool bridge does not reinterpret JSON-looking
+  strings.
+- Publish parameter descriptions and MCP instructions that prohibit
+  JSON-stringified nested arguments and Shell fallback.
+- Roll back newly seeded profile files if installation fails while preserving
+  every pre-existing user file.
+
 ## [1.0.0-rc.6] - 2026-07-29
 
 ### Changed

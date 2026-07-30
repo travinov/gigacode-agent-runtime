@@ -26,11 +26,11 @@ Runtime объединяет три read-only представления:
 - ровно один `system_prompt` или `system_prompt_file`;
 - необязательный `allowed_tools`.
 
-Встроенные примеры используют `REPLACE_WITH_GIGACODE_MODEL_ID`, потому что
-доступные model ID различаются между корпоративными установками. Скопируйте
-пример в user/project catalog и замените placeholder до запуска. Placeholder
-никогда не заменяется моделью по умолчанию: runtime отклоняет план с
-`MODEL_NOT_ALLOWED`.
+Installer размещает готовые сценарии `corporate-*` с корпоративными model ID в
+user catalog. Переносимые встроенные примеры используют
+`REPLACE_WITH_GIGACODE_MODEL_ID`, потому что доступные model ID различаются
+между установками. Placeholder никогда не заменяется моделью по умолчанию:
+runtime отклоняет такой план с `MODEL_NOT_ALLOWED`.
 
 ## DAG и `needs`
 
@@ -51,8 +51,15 @@ Runtime объединяет три read-only представления:
 
 ## Inputs, prompts и outputs
 
-`inputs` описывает типы, обязательность и default. Значения передаются через MCP
-как объект или через CLI:
+`inputs` описывает типы, обязательность и default. Через MCP значения
+передаются строкой `inputs_yaml`:
+
+```yaml
+task: Подготовить проектное решение
+```
+
+Не передавайте MCP-параметр `inputs` и не кодируйте JSON object строкой. Через
+CLI значения передаются так:
 
 ```bash
 agent-runtime scenario plan examples/scenarios/sequential.yaml \
@@ -82,6 +89,13 @@ agent-runtime scenario plan examples/scenarios/sequential.yaml \
 типизированных сбоев. Permanent failure не повторяется автоматически.
 
 Полные готовые примеры:
+
+- `~/.gigacode/agent-runtime/scenarios/corporate-sequential.yaml`
+- `~/.gigacode/agent-runtime/scenarios/corporate-parallel.yaml`
+- `~/.gigacode/agent-runtime/scenarios/corporate-mixed.yaml`
+- `~/.gigacode/agent-runtime/scenarios/corporate-review-repair-loop.yaml`
+
+Переносимые шаблоны:
 
 - [sequential.yaml](../examples/scenarios/sequential.yaml)
 - [parallel.yaml](../examples/scenarios/parallel.yaml)

@@ -22,7 +22,9 @@ async def test_expected_error_has_stable_public_contract(tmp_path: Path) -> None
         "ok": False,
         "error": {
             "code": "CONFIG_INVALID",
-            "message": "Provide exactly one of scenario_name or inline_scenario",
+            "message": (
+                "Provide exactly one of scenario_name or inline_scenario_yaml"
+            ),
             "details": {},
             "retryable": False,
         },

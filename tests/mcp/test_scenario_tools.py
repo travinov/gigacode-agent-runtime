@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from gigacode_agent_runtime.mcp_server import create_mcp_server
 from gigacode_agent_runtime.mcp_tools import McpToolService
 from tests.helpers.scheduler import scheduler_config
 from tests.mcp.conftest import write_project_scenario
@@ -55,6 +56,91 @@ async def test_inline_scenario_validates_and_plans(tmp_path: Path) -> None:
 
     assert validated["ok"] is True
     assert planned["data"]["scenario_name"] == "sequential-valid"
+
+
+@pytest.mark.anyio
+async def test_qwen_wire_contract_accepts_yaml_text_arguments(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project-scenarios"
+    write_project_scenario(project, SCENARIOS / "minimal-valid.yaml")
+    server = create_mcp_server(
+        McpToolService(
+            scheduler_config(tmp_path),
+            project_scenarios=project,
+        )
+    )
+
+    _content, planned = await server.call_tool(
+        "plan_scenario",
+        {
+            "scenario_name": "minimal-valid",
+            "workspace": str(tmp_path),
+            "inputs_yaml": "task: inspect the corporate runtime\n",
+        },
+    )
+    _content, validated = await server.call_tool(
+        "validate_scenario",
+        {
+            "inline_scenario_yaml": (
+                SCENARIOS / "sequential-valid.yaml"
+            ).read_text(),
+        },
+    )
+
+    assert planned["ok"] is True
+    assert planned["data"]["inputs"] == {
+        "task": "inspect the corporate runtime",
+    }
+    assert validated["data"]["valid"] is True
+
+
+@pytest.mark.anyio
+async def test_qwen_wire_contract_rejects_non_mapping_inputs_yaml(
+    tmp_path: Path,
+) -> None:
+    server = create_mcp_server(McpToolService(scheduler_config(tmp_path)))
+
+    _content, response = await server.call_tool(
+        "plan_scenario",
+        {
+            "scenario_name": "sequential",
+            "workspace": str(tmp_path),
+            "inputs_yaml": "- not\n- a\n- mapping\n",
+        },
+    )
+
+    assert response == {
+        "ok": False,
+        "error": {
+            "code": "SCENARIO_INVALID",
+            "message": "inputs_yaml must decode to a mapping with string keys",
+            "details": {"parameter": "inputs_yaml"},
+            "retryable": False,
+        },
+    }
+
+
+@pytest.mark.anyio
+async def test_qwen_wire_contract_rejects_non_json_yaml_values(
+    tmp_path: Path,
+) -> None:
+    server = create_mcp_server(McpToolService(scheduler_config(tmp_path)))
+
+    _content, response = await server.call_tool(
+        "plan_scenario",
+        {
+            "scenario_name": "sequential",
+            "workspace": str(tmp_path),
+            "inputs_yaml": "task: 2026-07-30\n",
+        },
+    )
+
+    assert response["ok"] is False
+    assert response["error"]["code"] == "SCENARIO_INVALID"
+    assert response["error"]["message"] == (
+        "inputs_yaml must contain only JSON-compatible values"
+    )
 
 
 @pytest.mark.anyio

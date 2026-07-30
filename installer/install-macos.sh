@@ -11,8 +11,18 @@ PREVIOUS_TARGET=""
 ROLLBACK_TARGET=""
 GIGACODE=""
 VERSION_DIR=""
+SEED_ROLLBACK_FILE=""
 
 rollback_failed_install() {
+  if [ -n "$SEED_ROLLBACK_FILE" ] && [ -f "$SEED_ROLLBACK_FILE" ]; then
+    while IFS= read -r SEEDED_PATH; do
+      if [ -n "$SEEDED_PATH" ]; then
+        gar_assert_safe_under "$SEEDED_PATH" "$GAR_DATA_DIR"
+        /bin/rm -f "$SEEDED_PATH"
+      fi
+    done < "$SEED_ROLLBACK_FILE"
+    /bin/rm -f "$SEED_ROLLBACK_FILE"
+  fi
   if [ "$ROLLBACK_REQUIRED" -eq 1 ]; then
     if [ -n "$ROLLBACK_TARGET" ]; then
       gar_switch_current "$ROLLBACK_TARGET" || true
@@ -30,6 +40,43 @@ rollback_failed_install() {
   if [ "$CREATED_VERSION" -eq 1 ] && [ -n "$VERSION_DIR" ]; then
     gar_remove_tree "$VERSION_DIR" "$GAR_INSTALL_ROOT/versions"
   fi
+}
+
+seed_file_if_missing() {
+  SOURCE=$1
+  TARGET=$2
+  [ -f "$SOURCE" ] || gar_die "corporate profile file is missing: $SOURCE"
+  if [ -e "$TARGET" ] || [ -L "$TARGET" ]; then
+    echo "preserved existing profile file: $TARGET"
+    return 0
+  fi
+  TEMP_TARGET="${TARGET}.tmp.$$"
+  /bin/rm -f "$TEMP_TARGET"
+  /bin/cp "$SOURCE" "$TEMP_TARGET"
+  chmod 600 "$TEMP_TARGET"
+  /bin/mv -f "$TEMP_TARGET" "$TARGET"
+  printf '%s\n' "$TARGET" >> "$SEED_ROLLBACK_FILE"
+  echo "installed corporate profile file: $TARGET"
+}
+
+seed_corporate_profile() {
+  PROFILE_ROOT="$RELEASE_ROOT/corporate-profile"
+  [ -d "$PROFILE_ROOT/scenarios" ] || \
+    gar_die "corporate scenario profile is missing"
+  SEED_ROLLBACK_FILE="$GAR_DATA_DIR/.install-seeded.$$"
+  : > "$SEED_ROLLBACK_FILE"
+  seed_file_if_missing \
+    "$PROFILE_ROOT/config.yaml" \
+    "$GAR_DATA_DIR/config.yaml"
+  SCENARIO_COUNT=0
+  for SOURCE_SCENARIO in "$PROFILE_ROOT/scenarios/"*.yaml; do
+    [ -f "$SOURCE_SCENARIO" ] || continue
+    SCENARIO_COUNT=$((SCENARIO_COUNT + 1))
+    seed_file_if_missing \
+      "$SOURCE_SCENARIO" \
+      "$GAR_DATA_DIR/scenarios/$(basename "$SOURCE_SCENARIO")"
+  done
+  [ "$SCENARIO_COUNT" -gt 0 ] || gar_die "corporate scenario profile is empty"
 }
 
 on_exit() {
@@ -105,6 +152,9 @@ gar_switch_current "$VERSION_TARGET"
 gar_install_launcher
 gar_fail_after activate
 
+seed_corporate_profile
+gar_fail_after seed
+
 "$VERSION_DIR/venv/bin/agent-runtime" diagnose --json >/dev/null
 gar_register_mcp "$GIGACODE"
 gar_fail_after register
@@ -115,6 +165,8 @@ if [ -n "$ROLLBACK_TARGET" ] && [ "$ROLLBACK_TARGET" != "$VERSION_TARGET" ]; the
   printf '%s\n' "$ROLLBACK_TARGET" > "$GAR_PREVIOUS_FILE"
 fi
 ROLLBACK_REQUIRED=0
+/bin/rm -f "$SEED_ROLLBACK_FILE"
+SEED_ROLLBACK_FILE=""
 trap - EXIT HUP INT TERM
 
 echo "installed GigaCode Agent Runtime $GAR_VERSION"

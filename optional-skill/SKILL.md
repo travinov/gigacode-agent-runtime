@@ -15,7 +15,12 @@ subagent calls.
   `describe_scenario`. The latter returns complete agent, step, dependency,
   output-schema, and result definitions; use those definitions as the source of
   truth instead of guessing YAML fields.
-- Accept a named catalog scenario or an inline scenario. Provide exactly one.
+- Prefer the installed `corporate-sequential`, `corporate-parallel`,
+  `corporate-mixed`, or `corporate-review-repair-loop` scenario for corporate
+  acceptance. They already contain approved model IDs.
+- Accept a named catalog scenario or `inline_scenario_yaml`. Provide exactly
+  one. Pass an inline scenario as YAML text beginning with `schema_version`,
+  never as JSON text.
 - Use `diagnose_runtime` when GigaCode, MCP, Web UI, model selection, or local
   permissions appear unavailable.
 - Use `open_dashboard` when the user wants live monitoring.
@@ -23,19 +28,22 @@ subagent calls.
 ## Prepare and start
 
 1. Call `validate_scenario`.
-2. Call `plan_scenario` with the exact workspace and inputs.
-3. Inspect and summarize waves, model IDs, permissions, workspace, capability
+2. Encode scenario input values as YAML mapping text in `inputs_yaml`. For
+   example: `task: Check the local MCP runtime`. Never call the removed
+   `inputs` parameter and never JSON-encode the mapping.
+3. Call `plan_scenario` with the exact workspace and `inputs_yaml`.
+4. Inspect and summarize waves, model IDs, permissions, workspace, capability
    requirements, and `plan_hash`.
-4. Call `start_run` only when the user asked to execute. Reuse a stable
-   `idempotency_key` when retrying the same request.
-5. Return the `run_id` and dashboard URL.
+5. Call `start_run` with the identical `inputs_yaml` only when the user asked
+   to execute. Reuse a stable `idempotency_key` when retrying the same request.
+6. Return the `run_id` and dashboard URL.
 
 Never skip validation or planning. Never claim that parallel execution occurs
 unless the plan places independent steps in the same wave.
 
 `idempotency_key` is not a `run_id`. Poll only the `run_id` returned by
 `start_run`. If the MCP connection times out before returning it, reconnect and
-repeat `start_run` with the identical scenario, inputs, workspace, and
+repeat `start_run` with the identical scenario, `inputs_yaml`, workspace, and
 `idempotency_key`; the runtime returns the existing run. Do not assume the run
 was not created.
 

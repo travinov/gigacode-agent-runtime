@@ -28,7 +28,15 @@ def test_installer_shell_contract_and_syntax() -> None:
     assert '"$GAR_MCP_NAME" "$GAR_LAUNCHER" mcp-serve' in common
     assert "Darwin" in common and "x86_64" in common
     assert "eval " not in install + common
-    for stage in ("preflight", "venv", "install", "activate", "register", "verify"):
+    for stage in (
+        "preflight",
+        "venv",
+        "install",
+        "activate",
+        "seed",
+        "register",
+        "verify",
+    ):
         assert f"gar_fail_after {stage}" in install
     scripts = (
         ROOT / "installer" / "install-macos.sh",
@@ -43,7 +51,7 @@ def test_installer_shell_contract_and_syntax() -> None:
 
 @pytest.mark.parametrize(
     "stage",
-    ["preflight", "venv", "install", "activate", "register", "verify"],
+    ["preflight", "venv", "install", "activate", "seed", "register", "verify"],
 )
 def test_failure_injection_rolls_back_every_stage(
     tmp_path: Path,
@@ -67,6 +75,9 @@ def test_failure_injection_rolls_back_every_stage(
     assert not launcher.exists()
     versions = install_root / "versions"
     assert not versions.exists() or list(versions.iterdir()) == []
+    data_dir = Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
+    assert not (data_dir / "config.yaml").exists()
+    assert not list((data_dir / "scenarios").glob("corporate-*.yaml"))
 
 
 def test_install_keeps_venv_at_created_path_and_is_idempotent(
@@ -91,6 +102,42 @@ def test_install_keeps_venv_at_created_path_and_is_idempotent(
     assert entrypoint.is_file()
     assert ".install-1.0.0" not in entrypoint.read_text()
     assert os.readlink(install_root / "current").startswith("versions/1.0.0-")
+    data_dir = Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
+    assert (data_dir / "config.yaml").read_text() == (
+        ROOT / "corporate-profile" / "config.yaml"
+    ).read_text()
+    assert {
+        path.name for path in (data_dir / "scenarios").glob("corporate-*.yaml")
+    } == {
+        "corporate-mixed.yaml",
+        "corporate-parallel.yaml",
+        "corporate-review-repair-loop.yaml",
+        "corporate-sequential.yaml",
+    }
+
+
+def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
+    release, fake_python, fake_gigacode = synthetic_release(tmp_path)
+    environment = installer_environment(tmp_path, fake_python, fake_gigacode)
+    data_dir = Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
+    config = data_dir / "config.yaml"
+    scenario = data_dir / "scenarios" / "corporate-sequential.yaml"
+    config.parent.mkdir(parents=True)
+    scenario.parent.mkdir(parents=True)
+    config.write_text("existing config\n")
+    scenario.write_text("existing scenario\n")
+
+    completed = subprocess.run(
+        ["sh", str(release / "installer" / "install-macos.sh")],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert config.read_text() == "existing config\n"
+    assert scenario.read_text() == "existing scenario\n"
+    assert "preserved existing profile file" in completed.stdout
 
 
 def test_install_replaces_non_runnable_version_directory(tmp_path: Path) -> None:

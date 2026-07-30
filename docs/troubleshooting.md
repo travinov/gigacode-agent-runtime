@@ -33,17 +33,32 @@ state, лимиты и permission gates.
 
 ## Invalid model
 
-Замените `REPLACE_WITH_GIGACODE_*` на точный корпоративный model ID. Если
-настроен `gigacode.model_allowlist`, model должен присутствовать и там.
-Placeholder не подставляется автоматически и отклоняется во время
-`plan_scenario`.
+Для первого acceptance используйте автоматически установленные
+`corporate-sequential`, `corporate-parallel`, `corporate-mixed` или
+`corporate-review-repair-loop`. Они уже содержат точные корпоративные model ID.
+Переносимые встроенные шаблоны с `REPLACE_WITH_GIGACODE_*` не предназначены для
+запуска без настройки. Placeholder не подставляется автоматически и
+отклоняется во время `plan_scenario`.
+
+## `params/inputs must be object`
+
+RC7 не выставляет неоднозначный MCP-параметр `inputs`. Передавайте значения
+сценария через YAML-строку:
+
+```text
+inputs_yaml: "task: Проверить локальный MCP runtime"
+```
+
+Не передавайте вложенный JSON object и не передавайте JSON-encoded string.
+Для inline-сценария используйте `inline_scenario_yaml` с YAML-текстом,
+начинающимся с `schema_version`.
 
 ## Timeout ответа `start_run`
 
 Клиентский timeout не доказывает, что run не был сохранён.
 
 1. Переподключите MCP.
-2. Повторите `start_run` с идентичными scenario, inputs, workspace и
+2. Повторите `start_run` с идентичными scenario, `inputs_yaml`, workspace и
    `idempotency_key`.
 3. Возьмите возвращённый `run_id`.
 4. Только после этого вызывайте `get_run_status` и `get_run_events`.

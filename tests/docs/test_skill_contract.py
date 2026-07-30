@@ -45,4 +45,7 @@ def test_optional_skill_enforces_runtime_workflow() -> None:
     assert text.index("`validate_scenario`") < text.index("`plan_scenario`")
     assert text.index("`plan_scenario`") < text.index("`start_run`")
     assert "Do not recreate its scheduler" in text
+    assert "`inputs_yaml`" in text
+    assert "never JSON-encode the mapping" in text
+    assert "never fall back to Shell" in text
     assert "Draw.io" not in text

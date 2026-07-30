@@ -113,7 +113,17 @@ sh ./install.sh
 
 Installer ничего не скачивает. Он создаёт изолированное Python-окружение,
 устанавливает зависимости из ZIP и регистрирует пользовательский stdio
-MCP-сервер с именем `gigacode-agent-runtime`.
+MCP-сервер с именем `gigacode-agent-runtime`. На чистой установке он также
+создаёт готовый корпоративный профиль:
+
+- `~/.gigacode/agent-runtime/config.yaml`;
+- `~/.gigacode/agent-runtime/scenarios/corporate-sequential.yaml`;
+- `~/.gigacode/agent-runtime/scenarios/corporate-parallel.yaml`;
+- `~/.gigacode/agent-runtime/scenarios/corporate-mixed.yaml`;
+- `~/.gigacode/agent-runtime/scenarios/corporate-review-repair-loop.yaml`.
+
+Если файл уже существует, installer сохраняет его без изменений. Поэтому
+обновление runtime не перезаписывает пользовательскую конфигурацию или сценарий.
 
 ### Шаг 4. Проверить установку
 
@@ -126,9 +136,10 @@ gigacode mcp list
 
 В открытом GigaCode вызовите `/mcp`. Сервер `gigacode-agent-runtime` должен
 иметь статус «Подключен», а его инструменты не должны быть помечены как
-недействительные.
+недействительные. В `agent-runtime scenarios list --json` должны присутствовать
+четыре сценария `corporate-*` с `source_level: user`.
 
-### Шаг 5. Узнать точные model ID
+### Шаг 5. Проверить установленные model ID
 
 В интерактивном GigaCode используйте:
 
@@ -136,30 +147,26 @@ gigacode mcp list
 /model
 ```
 
-В сценарий копируется именно model ID, а не произвольное название роли.
-В проверках Draw.io Agent/Qwen использовались следующие ID:
+Готовый корпоративный профиль уже использует точные ID:
 
-- `GigaChat-3-Ultra`;
 - `vllm/Qwen3.6-35B-262k`;
-- `vllm/MiniMax-M3-113k`;
-- `vllm/DeepSeek-V4-Flash-262k`.
+- `vllm/DeepSeek-V4-Flash-262k`;
+- `vllm/MiniMax-M3-161k`;
+- `GigaChat-3.1-Ultra-128k`.
 
 Наличие ID в этом списке не гарантирует доступ в любой корпоративной установке.
-Сверьте их с `/model`. Если корпоративный GigaCode показывает другой ID или
-короткий alias, используйте значение из своей установки.
+Сверьте их с `/model`. Для текущего acceptance ручное копирование и
+редактирование YAML не требуется, если все четыре ID доступны.
 
-### Шаг 6. Создать каталоги пользовательских настроек
+### Шаг 6. Проверить автоматически установленные файлы
 
 ```bash
-mkdir -p "$HOME/.gigacode/agent-runtime/scenarios"
+test -f "$HOME/.gigacode/agent-runtime/config.yaml"
+ls "$HOME/.gigacode/agent-runtime/scenarios"/corporate-*.yaml
 ```
 
-Далее создайте:
-
-- `~/.gigacode/agent-runtime/config.yaml` — глобальные лимиты и разрешённые
-  модели;
-- `~/.gigacode/agent-runtime/scenarios/*.yaml` — сценарии, доступные во всех
-  проектах.
+Все команды должны завершиться успешно. Эти файлы устанавливаются прямо из
+проверенного ZIP; каталог `examples/` для первого acceptance не нужен.
 
 ## Глобальная конфигурация runtime
 
@@ -186,10 +193,10 @@ runtime:
 gigacode:
   executable: auto
   model_allowlist:
-    - GigaChat-3-Ultra
     - vllm/Qwen3.6-35B-262k
-    - vllm/MiniMax-M3-113k
     - vllm/DeepSeek-V4-Flash-262k
+    - vllm/MiniMax-M3-161k
+    - GigaChat-3.1-Ultra-128k
   environment_allowlist:
     - PATH
     - HOME
@@ -203,7 +210,7 @@ gigacode:
 
 permissions:
   default: read_only
-  allow_full_access: false
+  allow_full_access: true
   require_full_access_confirmation: true
   max_parallel_full_access_agents: 1
   max_full_access_loop_iterations: 3
@@ -306,9 +313,9 @@ Runtime объединяет три каталога:
 `metadata.description` описывает весь сценарий, а `system_prompt` описывает роль
 конкретного агента.
 
-## Первый последовательный сценарий
+## Готовый последовательный сценарий
 
-Создайте файл:
+Installer уже создаёт файл:
 
 ```text
 ~/.gigacode/agent-runtime/scenarios/corporate-sequential.yaml
@@ -322,8 +329,8 @@ kind: Scenario
 
 metadata:
   name: corporate-sequential
-  title: Creator and independent reviewer
-  description: Creator prepares a solution, then reviewer checks it.
+  title: Corporate creator and independent reviewer
+  description: Create a structured draft, then review it with a second model.
 
 inputs:
   task:
@@ -333,7 +340,7 @@ inputs:
 
 agents:
   creator:
-    model: GigaChat-3-Ultra
+    model: vllm/Qwen3.6-35B-262k
     permissions: propose_only
     system_prompt: |
       Ты автор решения.
@@ -357,9 +364,9 @@ steps:
       template: "Подготовь решение задачи: ${inputs.task}"
     output_schema:
       type: object
-      required: [solution]
+      required: [draft]
       properties:
-        solution:
+        draft:
           type: string
       additionalProperties: false
 
@@ -371,7 +378,7 @@ steps:
       template: |
         Проверь решение для задачи "${inputs.task}":
 
-        ${steps.create.output.solution}
+        ${steps.create.output.draft}
     output_schema:
       type: object
       required: [approved, feedback]
@@ -390,11 +397,12 @@ result:
 
 - `create.needs: []` — шаг готов в первой волне;
 - `review.needs: [create]` — шаг запускается только после успешного `create`;
-- `${steps.create.output.solution}` передаёт структурированный результат
+- `${steps.create.output.draft}` передаёт структурированный результат
   creator в prompt reviewer.
 
-Если одна из моделей отсутствует в `/model`, замените только соответствующий
-`agents.<имя>.model`.
+Точная версия файла поставляется в
+`corporate-profile/scenarios/corporate-sequential.yaml` и автоматически
+устанавливается в user catalog.
 
 ## Проверка и запуск сценария
 
@@ -958,7 +966,7 @@ inputs:
 
 agents:
   creator:
-    model: GigaChat-3-Ultra
+    model: vllm/Qwen3.6-35B-262k
     permissions: propose_only
     system_prompt: |
       Создавай и исправляй candidate по задаче и замечаниям reviewer.
@@ -1068,7 +1076,7 @@ candidate из предыдущей итерации.
 1. `list_scenarios` или `describe_scenario`; `describe_scenario` возвращает
    полный YAML-контракт агентов, шагов, зависимостей и output schemas;
 2. `validate_scenario`;
-3. `plan_scenario`;
+3. `plan_scenario` с `inputs_yaml`;
 4. проверка waves, моделей, permissions, workspace и `plan_hash`;
 5. `start_run`;
 6. `get_run_status` и `get_run_events`;
@@ -1084,10 +1092,14 @@ candidate из предыдущей итерации.
 Рабочий каталог: текущий проект.
 task: "Составить чек-лист безопасной офлайн-установки Python CLI".
 
-Сначала выполни validate_scenario и plan_scenario.
+Передай входные значения только через inputs_yaml как YAML-текст:
+task: Составить чек-лист безопасной офлайн-установки Python CLI
+Не используй параметр inputs и не кодируй JSON-объект строкой.
+
+Сначала выполни validate_scenario и plan_scenario с inputs_yaml.
 Покажи waves, модели, permissions, workspace и plan_hash.
-Если план валиден, вызови start_run с idempotency_key
-corporate-sequential-smoke-v1.
+Если план валиден, вызови start_run с тем же inputs_yaml и idempotency_key
+corporate-sequential-smoke-v1. Не переходи к Shell при ошибке MCP.
 Опрашивай get_run_status до конечного состояния, затем вызови
 get_run_events, get_run_result и open_dashboard.
 ```
@@ -1099,10 +1111,22 @@ get_run_events, get_run_result и open_dashboard.
 `get_run_events`, `get_run_result` и `open_dashboard` используйте только
 `run_id` из ответа `start_run`.
 
+`inputs_yaml` — строка с YAML mapping, а не вложенный JSON object и не
+JSON-encoded string. Например:
+
+```yaml
+task: Составить чек-лист проверки локального MCP-сервера
+```
+
+Для inline-сценария используйте `inline_scenario_yaml` и передавайте YAML,
+начинающийся с `schema_version`, а не JSON. Это wire-контракт совместимости с
+GigaCode/Qwen CLI.
+
 Если MCP-клиент оборвал запрос по timeout до получения ответа, после
-переподключения повторите `start_run` с теми же scenario, inputs, workspace и
-`idempotency_key`. Runtime вернёт уже созданный run вместо дублирования. Не
-делайте вывод, что run не существует, только по клиентскому timeout.
+переподключения повторите `start_run` с теми же scenario, `inputs_yaml`,
+workspace и `idempotency_key`. Runtime вернёт уже созданный run вместо
+дублирования. Не делайте вывод, что run не существует, только по клиентскому
+timeout.
 
 ### Full-access approval через MCP
 
@@ -1222,18 +1246,29 @@ Model ID сценария отсутствует в непустом
 
 ## Готовые примеры и дополнительная документация
 
-В репозитории находятся четыре базовых сценария:
+Для корпоративной проверки installer автоматически размещает четыре готовых
+сценария с проверенными model ID:
+
+- `corporate-sequential`;
+- `corporate-parallel`;
+- `corporate-mixed`;
+- `corporate-review-repair-loop`.
+
+Их исходники находятся в `corporate-profile/scenarios/`.
+
+В репозитории также находятся четыре переносимых шаблона:
 
 - [sequential.yaml](examples/scenarios/sequential.yaml);
 - [parallel.yaml](examples/scenarios/parallel.yaml);
 - [mixed.yaml](examples/scenarios/mixed.yaml);
 - [review-repair-loop.yaml](examples/scenarios/review-repair-loop.yaml).
 
-Встроенные примеры используют `REPLACE_WITH_GIGACODE_*`, потому что доступные
-model ID могут различаться между корпоративными установками. Скопируйте пример
-в user/project catalog и замените placeholder до запуска. Runtime намеренно
-отклоняет `plan_scenario` и `start_run`, пока хотя бы один agent model начинается
-с `REPLACE_WITH_`; автоматической подстановки модели по умолчанию нет.
+Переносимые встроенные шаблоны используют `REPLACE_WITH_GIGACODE_*`, потому что
+доступные model ID могут различаться между корпоративными установками. Для
+первого корпоративного acceptance используйте готовые `corporate-*`, поэтому
+копировать или исправлять шаблоны не требуется. Runtime намеренно отклоняет
+`plan_scenario` и `start_run`, пока хотя бы один agent model начинается с
+`REPLACE_WITH_`; автоматической подстановки модели по умолчанию нет.
 
 Дополнительные документы:
 

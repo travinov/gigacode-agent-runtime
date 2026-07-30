@@ -38,6 +38,33 @@ def test_all_published_scenario_examples_validate_but_require_models(
         assert captured.value.details["placeholder"] is True
 
 
+def test_corporate_profile_is_ready_to_plan_without_edits(
+    tmp_path: Path,
+) -> None:
+    profile = ROOT / "corporate-profile"
+    config = load_config(profile / "config.yaml", home=tmp_path / "home")
+    scenarios = sorted((profile / "scenarios").glob("*.yaml"))
+    allowed_models = {
+        "vllm/Qwen3.6-35B-262k",
+        "vllm/DeepSeek-V4-Flash-262k",
+        "vllm/MiniMax-M3-161k",
+        "GigaChat-3.1-Ultra-128k",
+    }
+
+    assert set(config.gigacode.model_allowlist) == allowed_models
+    assert config.permissions.allow_full_access is True
+    assert len(scenarios) == 4
+    for path in scenarios:
+        plan = compile_plan(
+            load_scenario_file(path),
+            config,
+            inputs={"task": "corporate profile test"},
+            workspace=tmp_path,
+        )
+        assert plan.metadata.name.startswith("corporate-")
+        assert {agent.model for agent in plan.agents.values()} <= allowed_models
+
+
 def test_public_docs_have_no_personal_paths_or_assignment_secrets() -> None:
     combined = "\n".join(path.read_text(encoding="utf-8") for path in PUBLIC_DOCS)
 

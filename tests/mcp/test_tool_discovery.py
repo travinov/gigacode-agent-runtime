@@ -24,5 +24,16 @@ async def test_discovery_exposes_complete_stable_tool_set(tmp_path: Path) -> Non
     assert all(tool.name and tool.description for tool in tools)
     schemas = {tool.name: tool.inputSchema for tool in tools}
     assert schemas["start_run"]["required"] == ["workspace"]
+    assert "inputs" not in schemas["plan_scenario"]["properties"]
+    assert "inline_scenario" not in schemas["plan_scenario"]["properties"]
+    assert schemas["plan_scenario"]["properties"]["inputs_yaml"]["anyOf"] == [
+        {"type": "string"},
+        {"type": "null"},
+    ]
+    assert (
+        "YAML mapping text"
+        in schemas["plan_scenario"]["properties"]["inputs_yaml"]["description"]
+    )
+    assert "inline_scenario_yaml" in schemas["validate_scenario"]["properties"]
     assert schemas["get_run_events"]["properties"]["limit"]["default"] == 100
     assert all(tool.outputSchema is not None for tool in tools)

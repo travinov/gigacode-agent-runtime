@@ -126,7 +126,7 @@ class McpToolService:
         if bool(scenario_name) == bool(inline_scenario):
             raise AgentRuntimeError(
                 ErrorCode.CONFIG_INVALID,
-                "Provide exactly one of scenario_name or inline_scenario",
+                "Provide exactly one of scenario_name or inline_scenario_yaml",
             )
         if inline_scenario is not None:
             return self._inline_scenario(inline_scenario)
