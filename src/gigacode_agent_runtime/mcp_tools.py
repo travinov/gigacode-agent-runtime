@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from types import TracebackType
 from typing import TYPE_CHECKING, Any, cast
+
+import anyio
 
 from .adapter_factory import create_gigacode_adapter
 from .approval_store import ApprovalStore
@@ -56,13 +59,22 @@ class McpToolService:
         self._adapter_factory = adapter_factory or self._default_adapter
         self._dashboard_url = dashboard_url
         self._web_server: LocalWebServer | None = None
+        self._background_tasks: anyio.abc.TaskGroup | None = None
+        self._web_start_lock = anyio.Lock()
 
     def _default_adapter(self) -> AgentAdapter:
         return create_gigacode_adapter(self.config)
 
     async def __aenter__(self) -> McpToolService:
         if not self._started:
-            await self._manager.__aenter__()
+            background_tasks = anyio.create_task_group()
+            await background_tasks.__aenter__()
+            try:
+                await self._manager.__aenter__()
+            except BaseException:
+                await background_tasks.__aexit__(None, None, None)
+                raise
+            self._background_tasks = background_tasks
             self._started = True
         return self
 
@@ -70,13 +82,17 @@ class McpToolService:
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: object,
+        traceback: TracebackType | None,
     ) -> None:
         if self._started:
             if self._web_server is not None:
                 await self._web_server.stop()
                 self._web_server = None
             await self._manager.__aexit__(exc_type, exc_value, traceback)
+            background_tasks = self._background_tasks
+            self._background_tasks = None
+            if background_tasks is not None:
+                await background_tasks.__aexit__(exc_type, exc_value, traceback)
             self._started = False
 
     def _require_started(self) -> None:
@@ -106,15 +122,24 @@ class McpToolService:
                 ErrorCode.CAPABILITY_UNAVAILABLE,
                 "Local dashboard is disabled in runtime configuration",
             )
-        if self._web_server is None:
-            from .web.server import LocalWebServer
+        async with self._web_start_lock:
+            if self._web_server is None:
+                from .web.server import LocalWebServer
 
-            self._web_server = LocalWebServer(
-                self,
-                host=self.config.web.host,
-                port=self.config.web.port,
-            )
-            await self._web_server.start()
+                background_tasks = self._background_tasks
+                if background_tasks is None:
+                    raise AgentRuntimeError(
+                        ErrorCode.INVALID_STATE_TRANSITION,
+                        "MCP runtime lifecycle has not started",
+                    )
+                web_server = LocalWebServer(
+                    self,
+                    host=self.config.web.host,
+                    port=self.config.web.port,
+                )
+                await web_server.start(task_group=background_tasks)
+                self._web_server = web_server
+        assert self._web_server is not None
         return self._web_server.url(run_id)
 
     def _scenario(

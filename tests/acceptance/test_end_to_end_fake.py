@@ -26,7 +26,7 @@ def _response_data(result: Any) -> dict[str, Any]:
 
 
 @pytest.mark.anyio
-async def test_real_stdio_mcp_runs_parallel_dag_with_clean_protocol(
+async def test_real_stdio_mcp_runs_parallel_dag_with_web_ui_enabled(
     tmp_path: Path,
 ) -> None:
     fake = FakeGigaCode(
@@ -53,7 +53,12 @@ async def test_real_stdio_mcp_runs_parallel_dag_with_clean_protocol(
                         "FAKE_GIGACODE_STATE_FILE",
                     ],
                 },
-                "web": {"enabled": False},
+                "web": {
+                    "enabled": True,
+                    "host": "127.0.0.1",
+                    "port": "auto",
+                    "open_automatically": False,
+                },
             }
         ),
         encoding="utf-8",
@@ -97,7 +102,9 @@ async def test_real_stdio_mcp_runs_parallel_dag_with_clean_protocol(
                     "idempotency_key": "acceptance-parallel",
                 },
             )
-            run_id = str(_response_data(started)["run_id"])
+            started_data = _response_data(started)
+            run_id = str(started_data["run_id"])
+            dashboard_url = str(started_data["dashboard_url"])
             with anyio.fail_after(10):
                 while True:
                     status = _response_data(
@@ -122,6 +129,8 @@ async def test_real_stdio_mcp_runs_parallel_dag_with_clean_protocol(
     first_wave = sorted(traces[:2], key=lambda item: item["start_monotonic"])
     assert initialized.serverInfo.name == "GigaCode Agent Runtime"
     assert [tool.name for tool in discovered.tools] == list(TOOL_NAMES)
+    assert dashboard_url.startswith("http://127.0.0.1:")
+    assert f"?run={run_id}#token=" in dashboard_url
     assert result["result"]["summary"] == "delayed success"
     assert len(traces) == 3
     assert first_wave[1]["start_monotonic"] < first_wave[0]["end_monotonic"]

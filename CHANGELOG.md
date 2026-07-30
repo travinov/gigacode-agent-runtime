@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0-rc.8] - 2026-07-30
+
+### Fixed
+
+- Keep the lazily started Web UI inside the MCP server lifespan instead of the
+  individual `start_run` request cancel scope.
+- Prevent `start_run` from hanging, failing the durable run before its first
+  step, and disconnecting the GigaCode stdio MCP client when Web UI is enabled.
+- Exercise the real stdio acceptance flow with Web UI enabled and verify that
+  the returned dashboard URL is bound to the created `run_id`.
+
 ## [1.0.0-rc.7] - 2026-07-30
 
 ### Added

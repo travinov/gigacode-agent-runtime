@@ -6,7 +6,6 @@ import json
 import mimetypes
 import socket
 from collections.abc import AsyncIterator
-from functools import partial
 from importlib.resources import files
 from pathlib import Path
 
@@ -323,7 +322,10 @@ class LocalWebServer:
                 lifespan="off",
             )
         )
-        self._task_group: anyio.abc.TaskGroup | None = None
+        self._owned_task_group: anyio.abc.TaskGroup | None = None
+        self._serve_done: anyio.Event | None = None
+        self._serve_error: BaseException | None = None
+        self._socket_closed = False
 
     def url(self, run_id: str | None = None) -> str:
         suffix = f"?run={run_id}" if run_id is not None else ""
@@ -332,24 +334,63 @@ class LocalWebServer:
             f"#token={self.auth.issue_bootstrap_token()}"
         )
 
-    async def start(self) -> None:
-        if self._task_group is not None:
+    async def _serve(self) -> None:
+        try:
+            await self._server.serve(sockets=[self._socket])
+        except BaseException as error:
+            self._serve_error = error
+        finally:
+            assert self._serve_done is not None
+            self._serve_done.set()
+
+    def _close_socket(self) -> None:
+        if not self._socket_closed:
+            self._socket.close()
+            self._socket_closed = True
+
+    async def start(
+        self,
+        *,
+        task_group: anyio.abc.TaskGroup | None = None,
+    ) -> None:
+        if self._serve_done is not None:
             return
-        self._task_group = anyio.create_task_group()
-        await self._task_group.__aenter__()
-        self._task_group.start_soon(
-            partial(self._server.serve, sockets=[self._socket])
-        )
-        with anyio.fail_after(5):
-            while not self._server.started:
-                await anyio.sleep(0.01)
+        self._serve_done = anyio.Event()
+        active_task_group = task_group
+        if active_task_group is None:
+            active_task_group = anyio.create_task_group()
+            await active_task_group.__aenter__()
+            self._owned_task_group = active_task_group
+        active_task_group.start_soon(self._serve)
+        try:
+            with anyio.fail_after(5):
+                while not self._server.started:
+                    if self._serve_done.is_set():
+                        raise AgentRuntimeError(
+                            ErrorCode.CAPABILITY_UNAVAILABLE,
+                            "Local dashboard failed to start",
+                            details={
+                                "exception_type": (
+                                    type(self._serve_error).__name__
+                                    if self._serve_error is not None
+                                    else "Unknown"
+                                )
+                            },
+                        )
+                    await anyio.sleep(0.01)
+        except BaseException:
+            await self.stop()
+            raise
 
     async def stop(self) -> None:
-        if self._task_group is None:
-            self._socket.close()
+        serve_done = self._serve_done
+        if serve_done is None:
+            self._close_socket()
             return
         self._server.should_exit = True
-        task_group = self._task_group
-        self._task_group = None
-        await task_group.__aexit__(None, None, None)
-        self._socket.close()
+        await serve_done.wait()
+        owned_task_group = self._owned_task_group
+        self._owned_task_group = None
+        if owned_task_group is not None:
+            await owned_task_group.__aexit__(None, None, None)
+        self._close_socket()
