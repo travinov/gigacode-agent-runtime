@@ -39,6 +39,7 @@ async def test_diagnostics_have_stable_statuses_without_llm_call(
     assert checks["platform_supported"]["status"] == "ok"
     assert checks["gigacode_capabilities_available"]["status"] == "ok"
     assert checks["model_allowlist_empty"]["status"] == "warning"
+    assert checks["agent_catalog_empty"]["status"] == "warning"
     assert checks["subprocess_smoke_not_requested"]["status"] == "ok"
 
 
@@ -103,3 +104,31 @@ async def test_opt_in_zero_data_subprocess_smoke(
     )
 
     assert _checks(report)["subprocess_smoke_passed"]["status"] == "ok"
+
+
+@pytest.mark.anyio
+async def test_diagnostics_validate_reusable_agent_catalog(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+    monkeypatch.setattr("platform.machine", lambda: "x86_64")
+    agents = tmp_path / "home" / ".gigacode" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "analyst.md").write_text(
+        "---\n"
+        "name: reusable-analyst\n"
+        "description: Reusable analyst.\n"
+        "---\n\n"
+        "Analyze requirements.\n"
+    )
+    config = scheduler_config(tmp_path)
+
+    report = await diagnose_runtime(
+        config,
+        lambda: scheduler_adapter(tmp_path, "success"),
+    )
+
+    check = _checks(report)["agent_catalog_available"]
+    assert check["status"] == "ok"
+    assert check["details"]["agents"] == ["reusable-analyst"]

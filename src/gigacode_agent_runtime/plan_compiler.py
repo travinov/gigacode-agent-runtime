@@ -137,16 +137,39 @@ def _compile_agents(
                 f"Model is not in the configured allowlist: {model}",
                 details={"agent": name, "model": model},
             )
+        source_ref: str | None = None
+        source_hash: str | None = None
+        profile_tools: tuple[str, ...] = ()
         if "system_prompt" in raw:
             system_prompt = str(raw["system_prompt"])
-        else:
+        elif "system_prompt_file" in raw:
             system_prompt = _resource_text(scenario, str(raw["system_prompt_file"]))
+        else:
+            source_ref = str(raw["agent_ref"])
+            profile = scenario.agent_profiles.get(source_ref)
+            if profile is None:
+                raise AgentRuntimeError(
+                    ErrorCode.AGENT_PROFILE_NOT_FOUND,
+                    f"GigaCode agent profile was not snapshotted: {source_ref}",
+                    details={"agent_ref": source_ref},
+                )
+            system_prompt = profile.system_prompt
+            source_hash = sha256_digest(profile.raw_content)
+            profile_tools = tuple(
+                tool for tool in profile.tools if tool not in profile.disallowed_tools
+            )
         agents[name] = AgentDefinition(
             name=name,
             model=model,
             permissions=PermissionMode(str(raw["permissions"])),
             system_prompt=system_prompt,
-            allowed_tools=tuple(str(item) for item in raw.get("allowed_tools", [])),
+            allowed_tools=(
+                tuple(str(item) for item in raw["allowed_tools"])
+                if "allowed_tools" in raw
+                else profile_tools
+            ),
+            source_ref=source_ref,
+            source_hash=source_hash,
         )
     return MappingProxyType(agents)
 
@@ -469,6 +492,16 @@ def execution_plan_from_document(document: Mapping[str, Any]) -> ExecutionPlan:
                     system_prompt=str(raw["system_prompt"]),
                     allowed_tools=tuple(
                         str(item) for item in raw.get("allowed_tools", [])
+                    ),
+                    source_ref=(
+                        str(raw["source_ref"])
+                        if raw.get("source_ref") is not None
+                        else None
+                    ),
+                    source_hash=(
+                        str(raw["source_hash"])
+                        if raw.get("source_hash") is not None
+                        else None
                     ),
                 )
                 for name, raw in agents_raw.items()

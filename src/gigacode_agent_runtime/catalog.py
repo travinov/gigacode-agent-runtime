@@ -5,6 +5,7 @@ from __future__ import annotations
 from importlib.resources import files
 from pathlib import Path
 
+from .agent_catalog import AgentProfileCatalog
 from .config import EffectiveConfig
 from .scenario_loader import ScenarioCatalog
 
@@ -23,9 +24,15 @@ def create_scenario_catalog(
     project_dir: Path | None = None,
     workspace_root: Path | None = None,
 ) -> ScenarioCatalog:
+    agent_catalog = create_agent_profile_catalog(config)
     return ScenarioCatalog(
         builtin_dir=builtin_scenarios_dir(),
         user_dir=config.paths.user_scenarios,
         project_dir=project_dir,
         workspace_root=workspace_root,
+        agent_catalog=agent_catalog,
     )
+
+
+def create_agent_profile_catalog(config: EffectiveConfig) -> AgentProfileCatalog:
+    return AgentProfileCatalog(config.paths.home / ".gigacode" / "agents")

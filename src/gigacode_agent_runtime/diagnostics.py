@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 from .adapters.capabilities import GigaCodeCapabilities
+from .agent_catalog import AgentProfileCatalog
 from .config import EffectiveConfig
 from .domain import PermissionMode
 from .errors import AgentRuntimeError
@@ -258,6 +259,34 @@ def _permission_check(config: EffectiveConfig) -> DiagnosticCheck:
     )
 
 
+def _agent_catalog_check(config: EffectiveConfig) -> DiagnosticCheck:
+    root = config.paths.home / ".gigacode" / "agents"
+    try:
+        profiles = AgentProfileCatalog(root).discover()
+    except AgentRuntimeError as error:
+        return DiagnosticCheck(
+            "error",
+            "agent_catalog_invalid",
+            error.message,
+            "Fix or remove the invalid Markdown agent reported in details.",
+            {"error_code": error.code.value, **dict(error.details)},
+        )
+    if not profiles:
+        return DiagnosticCheck(
+            "warning",
+            "agent_catalog_empty",
+            "No reusable GigaCode agent profiles were discovered",
+            "Create an agent with /agents create or add a Markdown file to the catalog.",
+            {"path": str(root), "count": 0},
+        )
+    return DiagnosticCheck(
+        "ok",
+        "agent_catalog_available",
+        f"Reusable GigaCode agent catalog contains {len(profiles)} profiles",
+        details={"path": str(root), "agents": sorted(profiles)},
+    )
+
+
 async def _capabilities_check(
     adapter_factory: Callable[[], CapabilityProbe],
 ) -> tuple[DiagnosticCheck, GigaCodeCapabilities | None]:
@@ -403,6 +432,7 @@ async def diagnose_runtime(
         _web_bind_check(config),
         _model_allowlist_check(config),
         _permission_check(config),
+        _agent_catalog_check(config),
     ]
     capability_check, capabilities = await _capabilities_check(adapter_factory)
     checks.append(capability_check)

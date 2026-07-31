@@ -40,6 +40,22 @@ state, лимиты и permission gates.
 запуска без настройки. Placeholder не подставляется автоматически и
 отклоняется во время `plan_scenario`.
 
+## Agent profile not found или invalid
+
+Проверьте единый пользовательский каталог:
+
+```bash
+agent-runtime agents list --json
+ls "$HOME/.gigacode/agents"/*.md
+```
+
+`agent_ref` использует формат `gigacode:<name>`, где `<name>` должен совпадать с
+полем `name` в YAML front matter, а не обязательно с именем файла. Runtime
+отклоняет отсутствующий профиль, дубликаты `name`, пустой system prompt,
+некорректный UTF-8 и symlink-файлы. Исправьте профиль и повторите
+`validate_scenario`; уже созданные runs продолжают использовать сохранённый
+снимок.
+
 ## `params/inputs must be object`
 
 RC7 не выставляет неоднозначный MCP-параметр `inputs`. Передавайте значения

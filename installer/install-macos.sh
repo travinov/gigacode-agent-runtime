@@ -17,7 +17,11 @@ rollback_failed_install() {
   if [ -n "$SEED_ROLLBACK_FILE" ] && [ -f "$SEED_ROLLBACK_FILE" ]; then
     while IFS= read -r SEEDED_PATH; do
       if [ -n "$SEEDED_PATH" ]; then
-        gar_assert_safe_under "$SEEDED_PATH" "$GAR_DATA_DIR"
+        case "$SEEDED_PATH" in
+          "$GAR_DATA_DIR"/*) gar_assert_safe_under "$SEEDED_PATH" "$GAR_DATA_DIR" ;;
+          "$GAR_AGENTS_DIR"/*) gar_assert_safe_under "$SEEDED_PATH" "$GAR_AGENTS_DIR" ;;
+          *) gar_die "seeded path is outside managed roots: $SEEDED_PATH" ;;
+        esac
         /bin/rm -f "$SEEDED_PATH"
       fi
     done < "$SEED_ROLLBACK_FILE"
@@ -77,6 +81,15 @@ seed_corporate_profile() {
       "$GAR_DATA_DIR/scenarios/$(basename "$SOURCE_SCENARIO")"
   done
   [ "$SCENARIO_COUNT" -gt 0 ] || gar_die "corporate scenario profile is empty"
+  AGENT_COUNT=0
+  for SOURCE_AGENT in "$PROFILE_ROOT/agents/"*.md; do
+    [ -f "$SOURCE_AGENT" ] || continue
+    AGENT_COUNT=$((AGENT_COUNT + 1))
+    seed_file_if_missing \
+      "$SOURCE_AGENT" \
+      "$GAR_AGENTS_DIR/$(basename "$SOURCE_AGENT")"
+  done
+  [ "$AGENT_COUNT" -gt 0 ] || gar_die "corporate agent profile is empty"
 }
 
 on_exit() {
@@ -112,7 +125,7 @@ PROJECT_DIGEST=$(
 )
 
 mkdir -p "$GAR_INSTALL_ROOT/versions" "$GAR_BIN_DIR" \
-  "$GAR_DATA_DIR/scenarios" "$GAR_DATA_DIR/runs"
+  "$GAR_DATA_DIR/scenarios" "$GAR_DATA_DIR/runs" "$GAR_AGENTS_DIR"
 VERSION_TARGET="versions/$GAR_VERSION-$PROJECT_DIGEST"
 VERSION_DIR="$GAR_INSTALL_ROOT/$VERSION_TARGET"
 PREVIOUS_TARGET=$(gar_read_current)

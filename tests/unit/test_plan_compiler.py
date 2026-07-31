@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from gigacode_agent_runtime.agent_catalog import AgentProfileCatalog
 from gigacode_agent_runtime.config import load_config
 from gigacode_agent_runtime.domain import LoopStepDefinition
 from gigacode_agent_runtime.errors import AgentRuntimeError, ErrorCode
@@ -135,3 +136,41 @@ def test_scenario_cannot_raise_global_parallel_limit(tmp_path: Path) -> None:
         )
 
     assert captured.value.code is ErrorCode.SCENARIO_INVALID
+
+
+def test_agent_ref_resolves_prompt_tools_and_provenance(tmp_path: Path) -> None:
+    agents = tmp_path / "home" / ".gigacode" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "analyst.md").write_text(
+        "---\n"
+        "name: reusable-analyst\n"
+        "description: Reusable analyst.\n"
+        "tools: [read_file, grep_search]\n"
+        "disallowedTools: [grep_search]\n"
+        "---\n\n"
+        "Analyze using the reusable role.\n"
+    )
+    scenario_path = tmp_path / "agent-ref.yaml"
+    scenario_path.write_text(
+        (FIXTURES / "minimal-valid.yaml").read_text().replace(
+            "system_prompt: Analyze the task and return structured JSON.",
+            "agent_ref: gigacode:reusable-analyst",
+        )
+    )
+    loaded = load_scenario_file(
+        scenario_path,
+        agent_catalog=AgentProfileCatalog(agents),
+    )
+
+    plan = compile_plan(
+        loaded,
+        _config(tmp_path),
+        inputs={"task": "inspect"},
+        workspace=tmp_path,
+    )
+    agent = plan.agents["analyst"]
+
+    assert agent.system_prompt == "Analyze using the reusable role."
+    assert agent.allowed_tools == ("read_file",)
+    assert agent.source_ref == "gigacode:reusable-analyst"
+    assert agent.source_hash == plan.resource_hashes["gigacode:reusable-analyst"]

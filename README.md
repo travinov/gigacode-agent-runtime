@@ -120,7 +120,9 @@ MCP-сервер с именем `gigacode-agent-runtime`. На чистой у�
 - `~/.gigacode/agent-runtime/scenarios/corporate-sequential.yaml`;
 - `~/.gigacode/agent-runtime/scenarios/corporate-parallel.yaml`;
 - `~/.gigacode/agent-runtime/scenarios/corporate-mixed.yaml`;
-- `~/.gigacode/agent-runtime/scenarios/corporate-review-repair-loop.yaml`.
+- `~/.gigacode/agent-runtime/scenarios/corporate-review-repair-loop.yaml`;
+- `~/.gigacode/agent-runtime/scenarios/corporate-agent-ref.yaml`;
+- `~/.gigacode/agents/business-analyst-proactive.md`.
 
 Если файл уже существует, installer сохраняет его без изменений. Поэтому
 обновление runtime не перезаписывает пользовательскую конфигурацию или сценарий.
@@ -131,13 +133,15 @@ MCP-сервер с именем `gigacode-agent-runtime`. На чистой у�
 ./installer/verify-installation.sh
 agent-runtime diagnose --subprocess-smoke --json
 agent-runtime scenarios list --json
+agent-runtime agents list --json
 gigacode mcp list
 ```
 
 В открытом GigaCode вызовите `/mcp`. Сервер `gigacode-agent-runtime` должен
 иметь статус «Подключен», а его инструменты не должны быть помечены как
 недействительные. В `agent-runtime scenarios list --json` должны присутствовать
-четыре сценария `corporate-*` с `source_level: user`.
+пять сценариев `corporate-*`, а `agent-runtime agents list --json` должен найти
+`business-analyst-proactive`.
 
 ### Шаг 5. Проверить установленные model ID
 
@@ -163,6 +167,7 @@ gigacode mcp list
 ```bash
 test -f "$HOME/.gigacode/agent-runtime/config.yaml"
 ls "$HOME/.gigacode/agent-runtime/scenarios"/corporate-*.yaml
+test -f "$HOME/.gigacode/agents/business-analyst-proactive.md"
 ```
 
 Все команды должны завершиться успешно. Эти файлы устанавливаются прямо из
@@ -288,30 +293,64 @@ permissions:
 
 ## Где создавать сценарии и агентов
 
-Runtime объединяет три каталога:
+Runtime объединяет три каталога сценариев:
 
 1. `<workspace>/.gigacode/scenarios/` — сценарии конкретного проекта;
 2. `~/.gigacode/agent-runtime/scenarios/` — пользовательские сценарии для всех
    проектов;
-3. встроенный каталог runtime — четыре примера.
+3. встроенный каталог runtime — четыре базовых примера.
 
 При совпадении `metadata.name` приоритет имеет проектный сценарий, затем
 пользовательский, затем встроенный.
 
-В v1 агент не создаётся отдельной командой и не хранится в глобальном реестре.
-Агенты объявляются внутри каждого scenario YAML в секции `agents`. Один и тот
-же agent definition можно использовать в нескольких `steps` этого сценария.
+Переиспользуемые агенты GigaCode находятся в пользовательском каталоге
+`~/.gigacode/agents/*.md`. Их можно создавать штатной командой GigaCode
+`/agents create`, а runtime обнаруживает те же файлы через
+`list_agent_profiles` или `agent-runtime agents list --json`.
+
+Сценарий может либо объявить prompt локально, либо сослаться на готового агента
+через `agent_ref: gigacode:<name>`. Один и тот же профиль можно использовать в
+разных сценариях, последовательных шагах, параллельных ветвях и петлях.
 
 Роль агента задаётся:
 
 - именем YAML-ключа, например `creator`;
 - точным `model`;
 - `permissions`;
-- инструкцией `system_prompt` или файлом `system_prompt_file`;
+- ровно одним из `system_prompt`, `system_prompt_file` или `agent_ref`;
 - при необходимости списком `allowed_tools`.
 
 `metadata.description` описывает весь сценарий, а `system_prompt` описывает роль
 конкретного агента.
+
+### Переиспользование агента из GigaCode
+
+Installer уже создаёт безопасный пример:
+
+```text
+~/.gigacode/agents/business-analyst-proactive.md
+~/.gigacode/agent-runtime/scenarios/corporate-agent-ref.yaml
+```
+
+Ссылка в сценарии выглядит так:
+
+```yaml
+agents:
+  business_analyst:
+    agent_ref: gigacode:business-analyst-proactive
+    model: vllm/Qwen3.6-35B-262k
+    permissions: propose_only
+```
+
+Runtime читает Markdown front matter и текст системной инструкции, затем
+фиксирует полное содержимое и SHA-256 профиля в `ExecutionPlan`. Уже созданный
+run продолжает использовать снимок даже после изменения исходного `.md`;
+следующий план получит новый hash. `model` и `permissions` остаются явными в
+сценарии: профиль не может незаметно повысить права или заменить модель.
+
+Если в профиле есть `tools` и `disallowedTools`, runtime применяет их как
+исходный allowlist только когда сценарий не задал собственный `allowed_tools`.
+Явный список сценария имеет приоритет.
 
 ## Готовый последовательный сценарий
 
@@ -538,8 +577,9 @@ inputs:
 |---|---:|---|---|
 | `model` | Да | Непустой точный model ID | Модель GigaCode для всех шагов этого агента. |
 | `permissions` | Да | Один из четырёх режимов | Реальный approval/sandbox режим дочернего GigaCode CLI. |
-| `system_prompt` | Один из двух | Непустая строка | Встроенное описание роли агента. |
-| `system_prompt_file` | Один из двух | Относительный путь | Роль из отдельного UTF-8 файла. Нельзя задавать вместе с `system_prompt`. |
+| `system_prompt` | Один из трёх | Непустая строка | Встроенное описание роли агента. |
+| `system_prompt_file` | Один из трёх | Относительный путь | Роль из отдельного UTF-8 файла рядом со сценарием. |
+| `agent_ref` | Один из трёх | `gigacode:<name>` | Переиспользуемый агент из `~/.gigacode/agents`. |
 | `allowed_tools` | Нет | Список уникальных строк | Точные tool ID, передаваемые через `--allowed-tools` для `full_access`, если GigaCode поддерживает capability. |
 
 Режимы `permissions`:
@@ -579,6 +619,10 @@ Runtime разрешает читать prompt/schema resources только и�
 фиксирует их содержимое в плане и включает hash ресурса в `plan_hash`. Путь
 задаётся относительно каталога scenario YAML и не должен выходить за
 разрешённый корень.
+
+Для `agent_ref` произвольные пути запрещены: runtime ищет имя только в
+`~/.gigacode/agents`, отклоняет symlink-файлы и дубликаты имён и включает
+снимок профиля в `scenario_hash`, `resource_hashes` и `plan_hash`.
 
 ### `result`
 
@@ -1083,15 +1127,17 @@ candidate из предыдущей итерации.
 
 Обычная автоматизация использует последовательность:
 
-1. `list_scenarios` или `describe_scenario`; `describe_scenario` возвращает
+1. при необходимости `list_agent_profiles` или `describe_agent_profile`, чтобы
+   найти переиспользуемые роли из `~/.gigacode/agents`;
+2. `list_scenarios` или `describe_scenario`; `describe_scenario` возвращает
    полный YAML-контракт агентов, шагов, зависимостей и output schemas;
-2. `validate_scenario`;
-3. `plan_scenario` с `inputs_yaml`;
-4. проверка waves, моделей, permissions, workspace и `plan_hash`;
-5. `start_run`;
-6. `get_run_status` и `get_run_events`;
-7. `get_run_result`;
-8. при необходимости `get_run_artifacts` или `open_dashboard`.
+3. `validate_scenario`;
+4. `plan_scenario` с `inputs_yaml`;
+5. проверка waves, моделей, permissions, workspace и `plan_hash`;
+6. `start_run`;
+7. `get_run_status` и `get_run_events`;
+8. `get_run_result`;
+9. при необходимости `get_run_artifacts` или `open_dashboard`.
 
 Пример запроса в чат GigaCode:
 
@@ -1108,8 +1154,8 @@ task: Составить чек-лист безопасной офлайн-ус�
 
 Сначала выполни validate_scenario и plan_scenario с inputs_yaml.
 Покажи waves, модели, permissions, workspace и plan_hash.
-Если план валиден, вызови start_run с тем же inputs_yaml и idempotency_key
-corporate-sequential-smoke-v1. Не переходи к Shell при ошибке MCP.
+Если план валиден, вызови start_run с тем же inputs_yaml. Не проси меня
+придумывать idempotency_key и не переходи к Shell при ошибке MCP.
 Опрашивай get_run_status до конечного состояния, затем вызови
 get_run_events, get_run_result и open_dashboard.
 ```
@@ -1120,6 +1166,10 @@ get_run_events, get_run_result и open_dashboard.
 `idempotency_key` не является `run_id`. Для `get_run_status`,
 `get_run_events`, `get_run_result` и `open_dashboard` используйте только
 `run_id` из ответа `start_run`.
+
+Обычный пользователь не задаёт `idempotency_key`. MCP-клиент может
+автоматически сгенерировать безопасный уникальный ключ для нового действия и
+сохранить его только для возможного retry этого же `start_run`.
 
 `inputs_yaml` — строка с YAML mapping, а не вложенный JSON object и не
 JSON-encoded string. Например:
@@ -1272,22 +1322,24 @@ runs/RUN_ID/artifacts/steps/STEP/attempt-N/stderr.txt
 
 ## Готовые примеры и дополнительная документация
 
-Для корпоративной проверки installer автоматически размещает четыре готовых
-сценария с проверенными model ID:
+Для корпоративной проверки installer автоматически размещает пять готовых
+сценариев с проверенными model ID:
 
 - `corporate-sequential`;
 - `corporate-parallel`;
 - `corporate-mixed`;
-- `corporate-review-repair-loop`.
+- `corporate-review-repair-loop`;
+- `corporate-agent-ref`.
 
 Их исходники находятся в `corporate-profile/scenarios/`.
 
-В репозитории также находятся четыре переносимых шаблона:
+В репозитории также находятся пять переносимых шаблонов:
 
 - [sequential.yaml](examples/scenarios/sequential.yaml);
 - [parallel.yaml](examples/scenarios/parallel.yaml);
 - [mixed.yaml](examples/scenarios/mixed.yaml);
-- [review-repair-loop.yaml](examples/scenarios/review-repair-loop.yaml).
+- [review-repair-loop.yaml](examples/scenarios/review-repair-loop.yaml);
+- [agent-ref.yaml](examples/scenarios/agent-ref.yaml).
 
 Переносимые встроенные шаблоны используют `REPLACE_WITH_GIGACODE_*`, потому что
 доступные model ID могут различаться между корпоративными установками. Для

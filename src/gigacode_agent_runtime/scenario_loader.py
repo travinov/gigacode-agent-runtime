@@ -11,6 +11,7 @@ from typing import Any, cast
 
 import yaml
 
+from .agent_catalog import AgentProfile, AgentProfileCatalog
 from .domain import ScenarioSource
 from .errors import AgentRuntimeError, ErrorCode
 from .interpolation import validate_template
@@ -28,6 +29,7 @@ class LoadedScenario:
     document: Mapping[str, Any]
     source: ScenarioSource
     resources: Mapping[str, ResolvedResource]
+    agent_profiles: Mapping[str, AgentProfile]
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,13 +138,30 @@ def _snapshot_resources(
     document: Mapping[str, Any],
     resolver: ContainedSourceResolver,
     base_dir: Path,
-) -> Mapping[str, ResolvedResource]:
+    agent_catalog: AgentProfileCatalog | None,
+) -> tuple[Mapping[str, ResolvedResource], Mapping[str, AgentProfile]]:
     resources: dict[str, ResolvedResource] = {}
+    agent_profiles: dict[str, AgentProfile] = {}
     for raw_agent in cast(Mapping[str, Any], document["agents"]).values():
         agent = cast(Mapping[str, Any], raw_agent)
         reference = agent.get("system_prompt_file")
         if isinstance(reference, str):
             resources[reference] = resolver.read_text(reference, base_dir=base_dir)
+        agent_ref = agent.get("agent_ref")
+        if isinstance(agent_ref, str):
+            if agent_catalog is None:
+                raise AgentRuntimeError(
+                    ErrorCode.AGENT_PROFILE_NOT_FOUND,
+                    "Scenario uses agent_ref but no GigaCode agent catalog is configured",
+                    details={"agent_ref": agent_ref},
+                )
+            profile = agent_catalog.load(agent_ref)
+            agent_profiles[agent_ref] = profile
+            resources[agent_ref] = ResolvedResource(
+                reference=agent_ref,
+                path=profile.source_path,
+                content=profile.raw_content,
+            )
 
     for step in _iter_agent_steps(document):
         prompt = cast(Mapping[str, Any], step["prompt"])
@@ -167,7 +186,7 @@ def _snapshot_resources(
                     details={"reference": output_schema},
                 )
             resources[output_schema] = resource
-    return MappingProxyType(resources)
+    return MappingProxyType(resources), MappingProxyType(agent_profiles)
 
 
 def load_scenario_file(
@@ -175,6 +194,7 @@ def load_scenario_file(
     *,
     level: str = "direct",
     workspace_root: Path | None = None,
+    agent_catalog: AgentProfileCatalog | None = None,
 ) -> LoadedScenario:
     resolved_path = path.resolve(strict=True)
     document = _read_scenario_document(resolved_path)
@@ -184,7 +204,12 @@ def load_scenario_file(
     base_dir = resolved_path.parent
     roots = (base_dir,) if workspace_root is None else (base_dir, workspace_root)
     resolver = ContainedSourceResolver(roots)
-    resources = _snapshot_resources(document, resolver, base_dir)
+    resources, agent_profiles = _snapshot_resources(
+        document,
+        resolver,
+        base_dir,
+        agent_catalog,
+    )
     metadata = cast(Mapping[str, Any], document["metadata"])
     source = ScenarioSource(level=level, path=resolved_path, root=base_dir)
     return LoadedScenario(
@@ -192,6 +217,7 @@ def load_scenario_file(
         document=MappingProxyType(document),
         source=source,
         resources=resources,
+        agent_profiles=agent_profiles,
     )
 
 
@@ -203,6 +229,7 @@ class ScenarioCatalog:
         user_dir: Path | None = None,
         project_dir: Path | None = None,
         workspace_root: Path | None = None,
+        agent_catalog: AgentProfileCatalog | None = None,
     ) -> None:
         self._levels = (
             ("builtin", builtin_dir),
@@ -210,6 +237,7 @@ class ScenarioCatalog:
             ("project", project_dir),
         )
         self._workspace_root = workspace_root
+        self._agent_catalog = agent_catalog
 
     def _discover_level(
         self,
@@ -234,6 +262,7 @@ class ScenarioCatalog:
                 resolved,
                 level=level,
                 workspace_root=self._workspace_root,
+                agent_catalog=self._agent_catalog,
             )
             if scenario.name in entries:
                 raise AgentRuntimeError(

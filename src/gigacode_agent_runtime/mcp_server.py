@@ -31,6 +31,13 @@ TOOL_DESCRIPTIONS = {
         "including agents, full step definitions, dependencies, output schemas, "
         "and result."
     ),
+    "list_agent_profiles": (
+        "List reusable native GigaCode agents discovered in ~/.gigacode/agents."
+    ),
+    "describe_agent_profile": (
+        "Return one reusable GigaCode agent profile, including its system prompt, "
+        "metadata, model hint, and tool declarations."
+    ),
     "validate_scenario": (
         "Validate a named scenario or inline_scenario_yaml without executing it."
     ),
@@ -139,6 +146,10 @@ def create_mcp_server(
             "start_run, pass inputs_yaml as YAML mapping text such as "
             "'task: inspect the runtime'; never JSON-stringify a nested object. "
             "For inline scenarios, pass YAML through inline_scenario_yaml. "
+            "Use list_agent_profiles to discover reusable agents and reference "
+            "them in scenario agents with agent_ref: gigacode:<name>. "
+            "Never ask a user to invent an idempotency key: generate one for a "
+            "new start action and reuse it only when retrying that exact action. "
             "Do not fall back to Shell when an MCP call fails."
         ),
         log_level="ERROR",
@@ -170,6 +181,19 @@ def create_mcp_server(
             scenario_name=scenario_name,
             inline_scenario=inline_scenario_yaml,
         )
+
+    async def describe_agent_profile_tool(
+        agent_name: Annotated[
+            str,
+            Field(
+                description=(
+                    "Native GigaCode agent name or gigacode:<name> reference from "
+                    "list_agent_profiles."
+                )
+            ),
+        ],
+    ) -> dict[str, object]:
+        return await tools.describe_agent_profile(agent_name)
 
     async def plan_scenario_tool(
         workspace: Annotated[
@@ -251,8 +275,10 @@ def create_mcp_server(
             str | None,
             Field(
                 description=(
-                    "Stable retry key for this exact scenario, inputs, and "
-                    "workspace. It is not a run_id."
+                    "Optional stable retry key for this exact scenario, inputs, "
+                    "and workspace. Generate it automatically for a new user "
+                    "action and reuse it only for retries; never ask the user to "
+                    "invent one. It is not a run_id."
                 )
             ),
         ] = None,
@@ -281,6 +307,16 @@ def create_mcp_server(
     )(
         tools.describe_scenario
     )
+    server.tool(
+        name="list_agent_profiles",
+        description=TOOL_DESCRIPTIONS["list_agent_profiles"],
+        structured_output=True,
+    )(tools.list_agent_profiles)
+    server.tool(
+        name="describe_agent_profile",
+        description=TOOL_DESCRIPTIONS["describe_agent_profile"],
+        structured_output=True,
+    )(describe_agent_profile_tool)
     server.tool(
         name="validate_scenario",
         description=TOOL_DESCRIPTIONS["validate_scenario"],

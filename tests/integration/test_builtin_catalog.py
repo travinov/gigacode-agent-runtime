@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from gigacode_agent_runtime.agent_catalog import AgentProfileCatalog
 from gigacode_agent_runtime.catalog import (
     builtin_scenarios_dir,
     create_scenario_catalog,
@@ -69,11 +70,17 @@ def test_project_override_does_not_modify_builtin_file(tmp_path: Path) -> None:
     assert load_scenario_file(builtin_path, level="builtin").source.level == "builtin"
 
 
-def test_repository_examples_match_builtin_scenario_names(tmp_path: Path) -> None:
-    examples = Path(__file__).parents[2] / "examples" / "scenarios"
+def test_repository_examples_cover_builtin_and_agent_ref_scenarios(tmp_path: Path) -> None:
+    examples_root = Path(__file__).parents[2] / "examples"
+    examples = examples_root / "scenarios"
     example_names = {
-        load_scenario_file(path).name for path in examples.glob("*.yaml")
+        load_scenario_file(
+            path,
+            agent_catalog=AgentProfileCatalog(examples_root / "agents"),
+        ).name
+        for path in examples.glob("*.yaml")
     }
     builtin_names = set(create_scenario_catalog(scheduler_config(tmp_path)).discover())
 
-    assert example_names == builtin_names
+    assert builtin_names <= example_names
+    assert example_names - builtin_names == {"agent-ref"}

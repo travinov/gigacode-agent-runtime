@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.0-rc.11] - 2026-07-31
+
+### Added
+
+- Reuse native Markdown agents from `~/.gigacode/agents` through explicit
+  `agent_ref: gigacode:<name>` scenario declarations.
+- Snapshot each referenced agent prompt and SHA-256 into the immutable plan so
+  resume remains stable after profile edits.
+- Add `list_agent_profiles` and `describe_agent_profile` MCP tools plus
+  `agent-runtime agents list|describe` CLI commands.
+- Install a non-destructive `business-analyst-proactive` profile and ready
+  `corporate-agent-ref` acceptance scenario.
+- Validate agent front matter, duplicate names, catalog paths, symlinks, tools,
+  and profile availability before execution.
+
 ## [1.0.0-rc.10] - 2026-07-31
 
 ### Fixed

@@ -42,9 +42,11 @@ gigacode mcp list
 ## 4. Проверить MCP discovery
 
 Откройте новый чат GigaCode и попросите вызвать `list_scenarios`, затем
-`describe_scenario` для `corporate-sequential`, затем `diagnose_runtime`.
+`list_agent_profiles`, `describe_agent_profile` для
+`business-analyst-proactive`, `describe_scenario` для `corporate-sequential`,
+затем `diagnose_runtime`.
 Убедитесь, что
-доступны все 16 tools из `docs/mcp-api.md`, каждый tool имеет непустое описание,
+доступны все 18 tools из `docs/mcp-api.md`, каждый tool имеет непустое описание,
 `/mcp` не показывает недействительные инструменты, `describe_scenario`
 возвращает полные поля `kind`, `needs`, `prompt` и `output_schema`, а ответы
 имеют envelope `ok/data` или `ok/error`.
@@ -56,6 +58,8 @@ Installer должен уже положить конфигурацию и го�
 ```bash
 test -f "$HOME/.gigacode/agent-runtime/config.yaml"
 ls "$HOME/.gigacode/agent-runtime/scenarios"/corporate-*.yaml
+test -f "$HOME/.gigacode/agents/business-analyst-proactive.md"
+agent-runtime agents list --json
 ```
 
 Проверьте готовые файлы без копирования или редактирования:
@@ -65,6 +69,8 @@ agent-runtime scenario validate \
   "$HOME/.gigacode/agent-runtime/scenarios/corporate-sequential.yaml" --json
 agent-runtime scenario validate \
   "$HOME/.gigacode/agent-runtime/scenarios/corporate-parallel.yaml" --json
+agent-runtime scenario validate \
+  "$HOME/.gigacode/agent-runtime/scenarios/corporate-agent-ref.yaml" --json
 ```
 
 В `/model` должны присутствовать:
@@ -96,6 +102,19 @@ agent-runtime scenario validate \
 Для parallel дополнительно вызовите `open_dashboard`. В Web UI обе ветви первой
 wave должны работать одновременно, а synthesize — стартовать после обеих.
 Зафиксируйте run IDs и screenshot без корпоративных данных.
+
+Затем проверьте переиспользуемого агента обычным пользовательским запросом:
+
+```text
+Помоги превратить идею внутреннего сервиса заявок сотрудников в понятные
+требования для команды разработки. Используй готового бизнес-аналитика и
+Agent Runtime, дождись завершения анализа и покажи итог.
+```
+
+GigaCode должен выбрать `corporate-agent-ref` или явно сослаться на
+`gigacode:business-analyst-proactive`, а план должен содержать `source_ref` и
+соответствующий SHA-256 в `resource_hashes`. Пользователь не указывает
+`idempotency_key` вручную.
 
 Не используйте MCP-параметр `inputs`: wire-контракт GigaCode/Qwen принимает
 значения сценария через строковый `inputs_yaml`. Не кодируйте JSON object

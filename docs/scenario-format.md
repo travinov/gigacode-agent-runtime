@@ -11,7 +11,7 @@ Runtime объединяет три read-only представления:
 
 1. `project`: `.gigacode/scenarios/` текущего проекта;
 2. `user`: `~/.gigacode/agent-runtime/scenarios/`;
-3. `builtin`: четыре сценария, установленные вместе с runtime.
+3. `builtin`: четыре базовых сценария, установленные вместе с runtime.
 
 Проектный сценарий перекрывает пользовательский и встроенный сценарий с тем же
 `metadata.name`. Исходный встроенный файл не изменяется.
@@ -23,8 +23,24 @@ Runtime объединяет три read-only представления:
 - `model`: точный model ID из корпоративного GigaCode;
 - `permissions`: `read_only`, `propose_only`, `workspace_write` или
   `full_access`;
-- ровно один `system_prompt` или `system_prompt_file`;
+- ровно один `system_prompt`, `system_prompt_file` или `agent_ref`;
 - необязательный `allowed_tools`.
+
+`agent_ref: gigacode:<name>` загружает Markdown-профиль из
+`~/.gigacode/agents`. Runtime использует тело файла как system prompt, а
+`model` и `permissions` по-прежнему требует явно указать в сценарии. Профиль и
+его hash фиксируются в плане, поэтому resume не зависит от последующего
+изменения файла.
+
+Пример:
+
+```yaml
+agents:
+  analyst:
+    agent_ref: gigacode:business-analyst-proactive
+    model: vllm/Qwen3.6-35B-262k
+    permissions: propose_only
+```
 
 Installer размещает готовые сценарии `corporate-*` с корпоративными model ID в
 user catalog. Переносимые встроенные примеры используют
@@ -94,6 +110,7 @@ agent-runtime scenario plan examples/scenarios/sequential.yaml \
 - `~/.gigacode/agent-runtime/scenarios/corporate-parallel.yaml`
 - `~/.gigacode/agent-runtime/scenarios/corporate-mixed.yaml`
 - `~/.gigacode/agent-runtime/scenarios/corporate-review-repair-loop.yaml`
+- `~/.gigacode/agent-runtime/scenarios/corporate-agent-ref.yaml`
 
 Переносимые шаблоны:
 
@@ -101,3 +118,4 @@ agent-runtime scenario plan examples/scenarios/sequential.yaml \
 - [parallel.yaml](../examples/scenarios/parallel.yaml)
 - [mixed.yaml](../examples/scenarios/mixed.yaml)
 - [review-repair-loop.yaml](../examples/scenarios/review-repair-loop.yaml)
+- [agent-ref.yaml](../examples/scenarios/agent-ref.yaml)

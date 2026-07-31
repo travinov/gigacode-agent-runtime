@@ -15,9 +15,13 @@ subagent calls.
   `describe_scenario`. The latter returns complete agent, step, dependency,
   output-schema, and result definitions; use those definitions as the source of
   truth instead of guessing YAML fields.
+- Discover native user agents with `list_agent_profiles` and
+  `describe_agent_profile`. Reuse them with
+  `agent_ref: gigacode:<name>` instead of copying their system prompts into a
+  scenario. Keep model IDs and permissions explicit in the scenario.
 - Prefer the installed `corporate-sequential`, `corporate-parallel`,
-  `corporate-mixed`, or `corporate-review-repair-loop` scenario for corporate
-  acceptance. They already contain approved model IDs.
+  `corporate-mixed`, `corporate-review-repair-loop`, or `corporate-agent-ref`
+  scenario for corporate acceptance. They already contain approved model IDs.
 - Accept a named catalog scenario or `inline_scenario_yaml`. Provide exactly
   one. Pass an inline scenario as YAML text beginning with `schema_version`,
   never as JSON text.
@@ -35,7 +39,9 @@ subagent calls.
 4. Inspect and summarize waves, model IDs, permissions, workspace, capability
    requirements, and `plan_hash`.
 5. Call `start_run` with the identical `inputs_yaml` only when the user asked
-   to execute. Reuse a stable `idempotency_key` when retrying the same request.
+   to execute. Generate a unique safe `idempotency_key` internally for the new
+   action and reuse it only when retrying that exact request. Never ask the user
+   to invent or manage this key.
 6. Return the `run_id` and dashboard URL.
 
 Never skip validation or planning. Never claim that parallel execution occurs

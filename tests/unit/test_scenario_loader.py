@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from gigacode_agent_runtime.agent_catalog import AgentProfileCatalog
 from gigacode_agent_runtime.errors import AgentRuntimeError, ErrorCode
 from gigacode_agent_runtime.scenario_loader import ScenarioCatalog, load_scenario_file
 
@@ -100,3 +101,50 @@ def test_scenario_path_escape_is_rejected(tmp_path: Path) -> None:
         load_scenario_file(scenario)
 
     assert captured.value.code is ErrorCode.PATH_NOT_ALLOWED
+
+
+def test_agent_ref_is_snapshotted_from_native_catalog(tmp_path: Path) -> None:
+    agents = tmp_path / "home" / ".gigacode" / "agents"
+    agents.mkdir(parents=True)
+    profile = agents / "analyst.md"
+    profile.write_text(
+        "---\n"
+        "name: reusable-analyst\n"
+        "description: Reusable analyst.\n"
+        "tools: [read_file]\n"
+        "---\n\n"
+        "Analyze from the reusable profile.\n"
+    )
+    scenario = tmp_path / "scenario.yaml"
+    scenario.write_text(
+        _scenario_text("with-agent-ref", "with agent ref").replace(
+            "system_prompt: Analyze.",
+            "agent_ref: gigacode:reusable-analyst",
+        )
+    )
+
+    loaded = load_scenario_file(
+        scenario,
+        agent_catalog=AgentProfileCatalog(agents),
+    )
+    profile.write_text("changed after snapshot")
+
+    assert loaded.agent_profiles["gigacode:reusable-analyst"].system_prompt == (
+        "Analyze from the reusable profile."
+    )
+    assert loaded.resources["gigacode:reusable-analyst"].content.startswith("---")
+
+
+def test_agent_ref_requires_configured_catalog(tmp_path: Path) -> None:
+    scenario = tmp_path / "scenario.yaml"
+    scenario.write_text(
+        _scenario_text("missing-agent-catalog", "missing agent catalog").replace(
+            "system_prompt: Analyze.",
+            "agent_ref: gigacode:reusable-analyst",
+        )
+    )
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        load_scenario_file(scenario)
+
+    assert captured.value.code is ErrorCode.AGENT_PROFILE_NOT_FOUND

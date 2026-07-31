@@ -156,3 +156,57 @@ async def test_builtin_placeholder_cannot_be_planned(tmp_path: Path) -> None:
     assert planned["ok"] is False
     assert planned["error"]["code"] == "MODEL_NOT_ALLOWED"
     assert planned["error"]["details"]["placeholder"] is True
+
+
+@pytest.mark.anyio
+async def test_agent_profiles_are_discovered_described_and_planned(
+    tmp_path: Path,
+) -> None:
+    agents = tmp_path / "home" / ".gigacode" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "analyst.md").write_text(
+        "---\n"
+        "name: reusable-analyst\n"
+        "description: Reusable requirements analyst.\n"
+        "color: Purple\n"
+        "---\n\n"
+        "Turn vague requests into testable requirements.\n"
+    )
+    project = tmp_path / "project-scenarios"
+    source = (SCENARIOS / "minimal-valid.yaml").read_text().replace(
+        "system_prompt: Analyze the task and return structured JSON.",
+        "agent_ref: gigacode:reusable-analyst",
+    )
+    project.mkdir()
+    (project / "agent-ref.yaml").write_text(source)
+    tools = McpToolService(
+        scheduler_config(tmp_path),
+        project_scenarios=project,
+    )
+
+    listed = await tools.list_agent_profiles()
+    described = await tools.describe_agent_profile("reusable-analyst")
+    scenario = await tools.describe_scenario("minimal-valid")
+    validated = await tools.validate_scenario(scenario_name="minimal-valid")
+    planned = await tools.plan_scenario(
+        scenario_name="minimal-valid",
+        inputs={"task": "formalize"},
+        workspace=str(tmp_path),
+    )
+
+    assert listed["data"]["agents"][0]["agent_ref"] == (
+        "gigacode:reusable-analyst"
+    )
+    assert described["data"]["system_prompt"] == (
+        "Turn vague requests into testable requirements."
+    )
+    assert scenario["data"]["resolved_agent_refs"][0]["name"] == (
+        "reusable-analyst"
+    )
+    assert validated["data"]["agent_refs"] == ["gigacode:reusable-analyst"]
+    assert planned["data"]["agents"]["analyst"]["source_ref"] == (
+        "gigacode:reusable-analyst"
+    )
+    assert planned["data"]["resource_hashes"]["gigacode:reusable-analyst"].startswith(
+        "sha256:"
+    )

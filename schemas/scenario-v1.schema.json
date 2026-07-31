@@ -143,6 +143,10 @@
           "type": "string",
           "minLength": 1
         },
+        "agent_ref": {
+          "type": "string",
+          "pattern": "^gigacode:[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
         "allowed_tools": {
           "type": "array",
           "items": {
@@ -156,13 +160,28 @@
         {
           "required": ["system_prompt"],
           "not": {
-            "required": ["system_prompt_file"]
+            "anyOf": [
+              {"required": ["system_prompt_file"]},
+              {"required": ["agent_ref"]}
+            ]
           }
         },
         {
           "required": ["system_prompt_file"],
           "not": {
-            "required": ["system_prompt"]
+            "anyOf": [
+              {"required": ["system_prompt"]},
+              {"required": ["agent_ref"]}
+            ]
+          }
+        },
+        {
+          "required": ["agent_ref"],
+          "not": {
+            "anyOf": [
+              {"required": ["system_prompt"]},
+              {"required": ["system_prompt_file"]}
+            ]
           }
         }
       ],

@@ -18,6 +18,8 @@
 |---|---|---|
 | `list_scenarios` | — | builtin/user/project catalog |
 | `describe_scenario` | `scenario_name` | полный scenario contract: metadata, inputs, agents, step definitions, dependencies, output schemas и result |
+| `list_agent_profiles` | — | агенты из `~/.gigacode/agents` с безопасными metadata |
+| `describe_agent_profile` | `agent_name` | metadata и system prompt одного агента |
 | `validate_scenario` | ровно один из `scenario_name`, `inline_scenario_yaml` | schema validation |
 | `plan_scenario` | `workspace`, scenario, `inputs_yaml` | неизменяемый ExecutionPlan |
 | `diagnose_runtime` | `subprocess_smoke=false` | structured local diagnostics |
@@ -49,6 +51,10 @@ wire-контракт для GigaCode/Qwen CLI.
 `start_run` с одинаковым `idempotency_key` и теми же параметрами возвращает тот
 же run. Повтор ключа с другим plan создаёт `IDEMPOTENCY_CONFLICT`.
 `idempotency_key` не является `run_id`.
+
+Для обычного пользовательского запуска `idempotency_key` можно не передавать.
+MCP-клиент должен генерировать его автоматически только для защиты повторной
+отправки одного и того же `start_run`; пользователь не обязан придумывать ключ.
 
 Если клиентский timeout произошёл до получения ответа `start_run`, после
 переподключения повторите тот же вызов с теми же scenario, `inputs_yaml`,

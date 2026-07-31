@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from gigacode_agent_runtime.agent_catalog import AgentProfileCatalog
 from gigacode_agent_runtime.config import load_config
 from gigacode_agent_runtime.errors import AgentRuntimeError, ErrorCode
 from gigacode_agent_runtime.plan_compiler import compile_plan
@@ -24,9 +25,12 @@ def test_all_published_scenario_examples_validate_but_require_models(
     config = load_config(home=tmp_path / "home")
     scenarios = sorted((ROOT / "examples" / "scenarios").glob("*.yaml"))
 
-    assert len(scenarios) == 4
+    assert len(scenarios) == 5
     for path in scenarios:
-        scenario = load_scenario_file(path)
+        scenario = load_scenario_file(
+            path,
+            agent_catalog=AgentProfileCatalog(ROOT / "examples" / "agents"),
+        )
         with pytest.raises(AgentRuntimeError) as captured:
             compile_plan(
                 scenario,
@@ -53,10 +57,13 @@ def test_corporate_profile_is_ready_to_plan_without_edits(
 
     assert set(config.gigacode.model_allowlist) == allowed_models
     assert config.permissions.allow_full_access is True
-    assert len(scenarios) == 4
+    assert len(scenarios) == 5
     for path in scenarios:
         plan = compile_plan(
-            load_scenario_file(path),
+            load_scenario_file(
+                path,
+                agent_catalog=AgentProfileCatalog(profile / "agents"),
+            ),
             config,
             inputs={"task": "corporate profile test"},
             workspace=tmp_path,

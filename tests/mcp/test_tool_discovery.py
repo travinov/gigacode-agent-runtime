@@ -35,5 +35,9 @@ async def test_discovery_exposes_complete_stable_tool_set(tmp_path: Path) -> Non
         in schemas["plan_scenario"]["properties"]["inputs_yaml"]["description"]
     )
     assert "inline_scenario_yaml" in schemas["validate_scenario"]["properties"]
+    assert schemas["describe_agent_profile"]["required"] == ["agent_name"]
+    assert "GigaCode agent" in (
+        schemas["describe_agent_profile"]["properties"]["agent_name"]["description"]
+    )
     assert schemas["get_run_events"]["properties"]["limit"]["default"] == 100
     assert all(tool.outputSchema is not None for tool in tools)

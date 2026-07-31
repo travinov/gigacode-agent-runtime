@@ -34,6 +34,8 @@ def _minimal_release(tmp_path: Path) -> Path:
         "corporate-profile/scenarios/corporate-parallel.yaml",
         "corporate-profile/scenarios/corporate-mixed.yaml",
         "corporate-profile/scenarios/corporate-review-repair-loop.yaml",
+        "corporate-profile/scenarios/corporate-agent-ref.yaml",
+        "corporate-profile/agents/business-analyst-proactive.md",
         "docs/corporate-acceptance-checklist.md",
         "docs/release-checklist.md",
         "requirements/runtime-py311.lock",

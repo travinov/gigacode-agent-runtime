@@ -14,6 +14,8 @@ from tests.cli.conftest import cli_environment, run_cli
     [
         ("diagnose", "--help"),
         ("scenarios", "list", "--help"),
+        ("agents", "list", "--help"),
+        ("agents", "describe", "--help"),
         ("scenario", "validate", "--help"),
         ("scenario", "plan", "--help"),
         ("run", "--help"),

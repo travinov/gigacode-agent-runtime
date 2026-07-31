@@ -84,6 +84,8 @@ class AgentDefinition:
     permissions: PermissionMode
     system_prompt: str
     allowed_tools: tuple[str, ...] = ()
+    source_ref: str | None = None
+    source_hash: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

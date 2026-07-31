@@ -78,6 +78,8 @@ def test_failure_injection_rolls_back_every_stage(
     data_dir = Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
     assert not (data_dir / "config.yaml").exists()
     assert not list((data_dir / "scenarios").glob("corporate-*.yaml"))
+    agents_dir = Path(environment["HOME"]) / ".gigacode" / "agents"
+    assert not (agents_dir / "business-analyst-proactive.md").exists()
 
 
 def test_install_keeps_venv_at_created_path_and_is_idempotent(
@@ -113,7 +115,10 @@ def test_install_keeps_venv_at_created_path_and_is_idempotent(
         "corporate-parallel.yaml",
         "corporate-review-repair-loop.yaml",
         "corporate-sequential.yaml",
+        "corporate-agent-ref.yaml",
     }
+    agents_dir = Path(environment["HOME"]) / ".gigacode" / "agents"
+    assert (agents_dir / "business-analyst-proactive.md").is_file()
 
 
 def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
@@ -122,10 +127,15 @@ def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
     data_dir = Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
     config = data_dir / "config.yaml"
     scenario = data_dir / "scenarios" / "corporate-sequential.yaml"
+    agent = Path(environment["HOME"]) / ".gigacode" / "agents" / (
+        "business-analyst-proactive.md"
+    )
     config.parent.mkdir(parents=True)
     scenario.parent.mkdir(parents=True)
+    agent.parent.mkdir(parents=True)
     config.write_text("existing config\n")
     scenario.write_text("existing scenario\n")
+    agent.write_text("existing agent\n")
 
     completed = subprocess.run(
         ["sh", str(release / "installer" / "install-macos.sh")],
@@ -137,6 +147,7 @@ def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
     assert completed.returncode == 0, completed.stderr
     assert config.read_text() == "existing config\n"
     assert scenario.read_text() == "existing scenario\n"
+    assert agent.read_text() == "existing agent\n"
     assert "preserved existing profile file" in completed.stdout
 
 

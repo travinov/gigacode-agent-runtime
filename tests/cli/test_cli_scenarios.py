@@ -56,3 +56,29 @@ def test_invalid_scenario_returns_exit_two_and_typed_json(tmp_path: Path) -> Non
     error = json.loads(planned.stdout)["error"]
     assert planned.returncode == 2
     assert error["code"] == "SCENARIO_INVALID"
+
+
+def test_agents_list_and_describe_use_native_user_catalog(tmp_path: Path) -> None:
+    agents = tmp_path / "home" / ".gigacode" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "analyst.md").write_text(
+        "---\n"
+        "name: reusable-analyst\n"
+        "description: Reusable analyst.\n"
+        "---\n\n"
+        "Analyze requirements.\n"
+    )
+
+    listed = run_cli(tmp_path, "agents", "list", "--json")
+    described = run_cli(
+        tmp_path,
+        "agents",
+        "describe",
+        "gigacode:reusable-analyst",
+        "--json",
+    )
+
+    assert listed.returncode == 0, listed.stderr
+    assert json.loads(listed.stdout)["agents"][0]["name"] == "reusable-analyst"
+    assert described.returncode == 0, described.stderr
+    assert json.loads(described.stdout)["system_prompt"] == "Analyze requirements."

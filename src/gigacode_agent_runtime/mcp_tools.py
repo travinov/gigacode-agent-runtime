@@ -10,8 +10,9 @@ from typing import TYPE_CHECKING, Any, cast
 import anyio
 
 from .adapter_factory import create_gigacode_adapter
+from .agent_catalog import AgentProfile
 from .approval_store import ApprovalStore
-from .catalog import create_scenario_catalog
+from .catalog import create_agent_profile_catalog, create_scenario_catalog
 from .config import EffectiveConfig
 from .diagnostics import diagnose_runtime
 from .domain import RunStatus
@@ -49,6 +50,7 @@ class McpToolService:
         self._manager = RunManager()
         self._started = False
         self._project_scenarios = project_scenarios
+        self._agent_catalog = create_agent_profile_catalog(config)
         self._catalog = create_scenario_catalog(
             config,
             project_dir=project_scenarios,
@@ -112,7 +114,7 @@ class McpToolService:
         path = self.config.runtime.data_dir / "inline-scenarios" / f"{digest}.yaml"
         if not path.exists():
             atomic_write_text(path, text)
-        return load_scenario_file(path)
+        return load_scenario_file(path, agent_catalog=self._agent_catalog)
 
     async def _ensure_dashboard(self, run_id: str | None) -> str:
         if self._dashboard_url is not None:
@@ -196,6 +198,53 @@ class McpToolService:
 
         return await public_result(operation)
 
+    @staticmethod
+    def _agent_profile_document(
+        profile: AgentProfile,
+        *,
+        include_prompt: bool,
+    ) -> dict[str, object]:
+        document: dict[str, object] = {
+            "name": profile.name,
+            "agent_ref": profile.reference,
+            "description": profile.description,
+            "source_path": str(profile.source_path),
+            "model": profile.model,
+            "approval_mode": profile.approval_mode,
+            "tools": list(profile.tools),
+            "disallowed_tools": list(profile.disallowed_tools),
+            "color": profile.color,
+            "scenario_model_required": True,
+            "scenario_permissions_required": True,
+        }
+        if include_prompt:
+            document["system_prompt"] = profile.system_prompt
+        return document
+
+    async def list_agent_profiles(self) -> dict[str, object]:
+        def operation() -> dict[str, object]:
+            profiles = [
+                self._agent_profile_document(profile, include_prompt=False)
+                for profile in sorted(
+                    self._agent_catalog.discover().values(),
+                    key=lambda item: item.name,
+                )
+            ]
+            return {
+                "catalog_root": str(self._agent_catalog.root),
+                "agents": profiles,
+            }
+
+        return await public_result(operation)
+
+    async def describe_agent_profile(self, agent_name: str) -> dict[str, object]:
+        return await public_result(
+            lambda: self._agent_profile_document(
+                self._agent_catalog.load(agent_name),
+                include_prompt=True,
+            )
+        )
+
     async def describe_scenario(self, scenario_name: str) -> dict[str, object]:
         def operation() -> dict[str, object]:
             scenario = self._catalog.load(scenario_name)
@@ -222,6 +271,13 @@ class McpToolService:
                 "result": dict(
                     cast(Mapping[str, object], scenario.document["result"])
                 ),
+                "resolved_agent_refs": [
+                    self._agent_profile_document(profile, include_prompt=False)
+                    for profile in sorted(
+                        scenario.agent_profiles.values(),
+                        key=lambda item: item.name,
+                    )
+                ],
             }
 
         return await public_result(operation)
@@ -240,6 +296,7 @@ class McpToolService:
                 "valid": True,
                 "name": scenario.name,
                 "resource_count": len(scenario.resources),
+                "agent_refs": sorted(scenario.agent_profiles),
             }
 
         return await public_result(operation)
