@@ -49,12 +49,11 @@ def test_fake_emits_stream_json_and_redacts_prompt_from_trace(tmp_path: Path) ->
             fake.executable,
             "--model",
             "code-model-id",
-            "--input-format",
-            "stream-json",
+            "--prompt",
+            secret_prompt,
             "--output-format",
             "stream-json",
         ],
-        input=json.dumps({"prompt": secret_prompt}) + "\n",
         env=fake.environment(),
         capture_output=True,
         text=True,
@@ -64,7 +63,7 @@ def test_fake_emits_stream_json_and_redacts_prompt_from_trace(tmp_path: Path) ->
     events = [json.loads(line) for line in completed.stdout.splitlines()]
     trace = fake.trace_file.read_text()
     assert events[-1]["type"] == "result"
-    assert events[-1]["result"]["approved"] is True
+    assert json.loads(events[-1]["result"].split("\n")[3])["approved"] is True
     assert secret_prompt not in trace
     assert "input_sha256" in trace
 
@@ -74,8 +73,8 @@ def test_delayed_fake_processes_overlap(tmp_path: Path) -> None:
     environment = fake.environment()
     command = [
         fake.executable,
-        "--input-format",
-        "stream-json",
+        "--prompt",
+        "safe prompt",
         "--output-format",
         "stream-json",
     ]
@@ -97,8 +96,8 @@ def test_delayed_fake_processes_overlap(tmp_path: Path) -> None:
         stderr=subprocess.PIPE,
         text=True,
     )
-    first.communicate('{"prompt":"first"}\n', timeout=3)
-    second.communicate('{"prompt":"second"}\n', timeout=3)
+    first.communicate(timeout=3)
+    second.communicate(timeout=3)
     elapsed = time.monotonic() - started
 
     assert first.returncode == 0

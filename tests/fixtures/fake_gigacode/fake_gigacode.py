@@ -16,12 +16,18 @@ from typing import Any
 _VALUE_OPTIONS = {
     "--model",
     "--system-prompt",
+    "--prompt",
     "--approval-mode",
     "--allowed-tools",
+    "--extensions",
+    "--max-session-turns",
+    "--core-tools",
+    "--allowed-mcp-server-names",
+    "--exclude-tools",
     "--input-format",
     "--output-format",
 }
-_SENSITIVE_OPTIONS = {"--system-prompt"}
+_SENSITIVE_OPTIONS = {"--system-prompt", "--prompt"}
 
 
 def _load_profile() -> dict[str, Any]:
@@ -101,9 +107,15 @@ def _help(profile: dict[str, Any]) -> str:
         "Usage: qwen [options] [prompt]",
         "  --model <model>",
         "  --system-prompt <prompt>",
+        "  --prompt <prompt>",
         "  --approval-mode <plan|default|auto-edit>",
         "  --allowed-tools <tools>",
         "  --sandbox",
+        "  --extensions <none|names>",
+        "  --max-session-turns <count>",
+        "  --core-tools <tools>",
+        "  --allowed-mcp-server-names <names>",
+        "  --exclude-tools <tools>",
         "  --input-format <text|stream-json>",
         "  --output-format <text|json|stream-json>",
     ]
@@ -136,7 +148,19 @@ def _emit_result(
             flush=True,
         )
         print(
-            json.dumps({"type": "result", "result": result}, separators=(",", ":")),
+            json.dumps(
+                {
+                    "type": "result",
+                    "subtype": "success",
+                    "is_error": False,
+                    "result": (
+                        "\n\n```json\n"
+                        + json.dumps(result, separators=(",", ":"))
+                        + "\n```"
+                    ),
+                },
+                separators=(",", ":"),
+            ),
             flush=True,
         )
     elif output_format == "json":
@@ -212,6 +236,13 @@ def main() -> int:
                 "end_monotonic": time.monotonic(),
                 "exit_code": exit_code,
                 "input_sha256": hashlib.sha256(stdin_text.encode()).hexdigest(),
+                "stdin_empty": stdin_text == "",
+                "prompt_option_present": "--prompt" in arguments,
+                "input_format_present": "--input-format" in arguments,
+                "system_prompt_has_output_contract": (
+                    "## Runtime output contract"
+                    in _option_value(arguments, "--system-prompt", "")
+                ),
                 "pgid": os.getpgid(0),
                 "pid": os.getpid(),
                 "start_monotonic": started,

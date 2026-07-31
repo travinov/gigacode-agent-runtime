@@ -19,11 +19,17 @@ def test_qwen_help_is_parsed_by_feature_not_only_version() -> None:
         """
         --model
         --system-prompt
+        --prompt
         --approval-mode <plan|default|auto-edit>
         --allowed-tools
         --sandbox
         --input-format <text|stream-json>
         --output-format <text|json|stream-json>
+        --extensions
+        --max-session-turns
+        --core-tools
+        --allowed-mcp-server-names
+        --exclude-tools
         """,
         "Usage: qwen mcp <add|remove|list>",
     )
@@ -32,6 +38,8 @@ def test_qwen_help_is_parsed_by_feature_not_only_version() -> None:
     assert capabilities.sandbox is True
     assert capabilities.stream_input is True
     assert capabilities.stream_output is True
+    assert capabilities.prompt is True
+    assert capabilities.agent_isolation is True
     assert capabilities.approval_modes == frozenset({"plan", "default", "auto-edit"})
     assert capabilities.mcp is True
 
@@ -41,6 +49,8 @@ def test_unknown_help_does_not_claim_dangerous_capabilities() -> None:
 
     assert capabilities.sandbox is False
     assert capabilities.allowed_tools is False
+    assert capabilities.prompt is False
+    assert capabilities.agent_isolation is False
     assert capabilities.approval_modes == frozenset()
 
 

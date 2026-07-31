@@ -48,12 +48,14 @@ def _capabilities(*, allowed_tools: bool = True) -> GigaCodeCapabilities:
         version="26.5.17",
         model_selection=True,
         system_prompt=True,
+        prompt=True,
         approval_modes=frozenset({"plan", "default", "auto-edit"}),
         allowed_tools=allowed_tools,
         sandbox=True,
         stream_input=True,
         json_output=True,
         stream_output=True,
+        agent_isolation=True,
         mcp=True,
     )
 

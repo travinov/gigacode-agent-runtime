@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, cast
+from typing import cast
 
 from ..errors import AgentRuntimeError, ErrorCode
 
@@ -27,6 +28,34 @@ def _invalid_output(message: str, *, line: int | None = None) -> AgentRuntimeErr
         details=details,
         retryable=True,
     )
+
+
+def _parse_object(value: object, *, source: str, line: int | None = None) -> Mapping[str, object]:
+    if isinstance(value, dict):
+        return MappingProxyType(cast(dict[str, object], value))
+    if not isinstance(value, str):
+        raise _invalid_output(f"{source} must contain a JSON object", line=line)
+
+    payload = value.strip()
+    if payload.startswith("```") or payload.endswith("```"):
+        fenced = re.fullmatch(
+            r"```(?:json)?[ \t]*\r?\n(?P<payload>[\s\S]*?)\r?\n```",
+            payload,
+            flags=re.IGNORECASE,
+        )
+        if fenced is None or "```" in fenced.group("payload"):
+            raise _invalid_output(
+                f"{source} has an ambiguous Markdown JSON fence",
+                line=line,
+            )
+        payload = fenced.group("payload").strip()
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise _invalid_output(f"{source} is not valid JSON", line=line) from exc
+    if not isinstance(parsed, dict):
+        raise _invalid_output(f"{source} must decode to a JSON object", line=line)
+    return MappingProxyType(cast(dict[str, object], parsed))
 
 
 class StreamJsonParser:
@@ -62,13 +91,17 @@ class StreamJsonParser:
             event = MappingProxyType(cast(dict[str, object], parsed))
             events.append(event)
             if parsed.get("type") == "result":
-                candidate = parsed.get("result")
-                if not isinstance(candidate, dict):
+                if parsed.get("is_error") is True:
                     raise _invalid_output(
-                        "GigaCode result event must contain an object",
+                        "GigaCode result event reports an error",
                         line=line_number,
                     )
-                result = MappingProxyType(cast(dict[str, object], candidate))
+                candidate = parsed.get("result")
+                result = _parse_object(
+                    candidate,
+                    source="GigaCode result event",
+                    line=line_number,
+                )
         if result is None:
             raise _invalid_output("GigaCode stream ended without a result event")
         return ParsedStream(events=tuple(events), result=result)
@@ -79,6 +112,6 @@ def parse_json_result(text: str) -> Mapping[str, object]:
         parsed = json.loads(text)
     except json.JSONDecodeError as exc:
         raise _invalid_output("GigaCode emitted invalid JSON") from exc
-    if not isinstance(parsed, dict) or not isinstance(parsed.get("result"), dict):
-        raise _invalid_output("GigaCode JSON output must contain an object result")
-    return MappingProxyType(cast(dict[str, Any], parsed["result"]))
+    if not isinstance(parsed, dict) or "result" not in parsed:
+        raise _invalid_output("GigaCode JSON output must contain a result")
+    return _parse_object(parsed["result"], source="GigaCode JSON result")

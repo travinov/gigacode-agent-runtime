@@ -81,6 +81,18 @@ permissions и tools; затем вызовите `approve_run` с точным 
 `SILENT` сам по себе не означает зависание. При достижении timeout runtime
 завершает process group и сохраняет typed error.
 
+## `GigaCode stream ended without a result event`
+
+RC9 использует проверенный для GigaCode/Qwen Code 0.13.1 контракт: запрос
+передаётся через `--prompt`, а `stream-json` включается только для вывода.
+Терминальный `result` может быть объектом, JSON-строкой или точным Markdown
+JSON-блоком.
+
+Если ошибка повторилась, вызовите `get_run_artifacts` и сохраните файлы
+`steps/<step>/attempt-<N>/stdout.jsonl` и `stderr.txt`. Оба файла создаются даже
+при нулевом размере stderr. Они содержат redacted-вывод фактически завершившегося
+дочернего GigaCode процесса.
+
 ## Interrupted после закрытия GigaCode
 
 Это ожидаемое сохранённое состояние. После повторного запуска вызовите

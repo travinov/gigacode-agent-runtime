@@ -30,6 +30,9 @@ async def test_failure_blocks_downstream_and_preserves_events(tmp_path: Path) ->
     assert result.state.steps["create"].status.value == "failed"
     assert result.state.steps["review"].status.value == "blocked"
     assert "run.failed" in event_types
+    capture_dir = prepared.run_dir / "artifacts" / "steps" / "create" / "attempt-1"
+    assert (capture_dir / "stdout.jsonl").exists()
+    assert (capture_dir / "stderr.txt").read_text() == "permanent fake failure\n"
 
 
 @pytest.mark.anyio
@@ -90,3 +93,7 @@ result:
     assert [
         event.type for event in prepared.events.read().events
     ].count("step.retrying") == 1
+    if profile == "invalid-transient":
+        capture_dir = prepared.run_dir / "artifacts" / "steps" / "work" / "attempt-1"
+        assert (capture_dir / "stdout.jsonl").read_text() == "{invalid-json\n"
+        assert (capture_dir / "stderr.txt").read_text() == ""

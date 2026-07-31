@@ -20,6 +20,33 @@ from ..redaction import Redactor
 from .capabilities import GigaCodeCapabilities, parse_capabilities
 from .stream_parser import ParsedStream, StreamJsonParser, parse_json_result
 
+_NO_TOOL_CORE_SENTINEL = "__gigacode_agent_runtime_agent_has_no_tools__"
+_NO_TOOL_EXCLUSIONS = (
+    "agent",
+    "task",
+    "skill",
+    "ask_user_question",
+    "ask_user",
+    "todo_write",
+    "write_todos",
+    "list_directory",
+    "read_file",
+    "read_many_files",
+    "grep_search",
+    "glob",
+    "run_shell_command",
+    "write_file",
+    "edit",
+    "replace",
+    "save_memory",
+    "web_fetch",
+    "web_search",
+    "lsp",
+    "mcp__*",
+    "exit_plan_mode",
+)
+_MAX_AGENT_TURNS = 4
+
 
 @dataclass(frozen=True, slots=True)
 class AgentRequest:
@@ -39,6 +66,30 @@ class AgentExecutionResult:
     process: ProcessResult
     environment_keys: tuple[str, ...]
     capabilities: GigaCodeCapabilities
+
+
+class AgentExecutionError(AgentRuntimeError):
+    """Typed failure that retains redacted subprocess captures for artifacts."""
+
+    def __init__(
+        self,
+        error: AgentRuntimeError,
+        *,
+        process: ProcessResult,
+        stdout: str,
+        stderr: str,
+        output_format: str,
+    ) -> None:
+        super().__init__(
+            error.code,
+            error.message,
+            details=error.details,
+            retryable=error.retryable,
+        )
+        self.process = process
+        self.stdout = stdout
+        self.stderr = stderr
+        self.output_format = output_format
 
 
 class GigaCodeQwenAdapter:
@@ -99,8 +150,16 @@ class GigaCodeQwenAdapter:
             mcp_help.stdout + mcp_help.stderr,
         )
 
+    @staticmethod
+    def _uses_allowed_tools(request: AgentRequest) -> bool:
+        return request.permission is PermissionMode.FULL_ACCESS and bool(
+            request.allowed_tools
+        )
+
     def _required_capabilities(self, request: AgentRequest) -> set[str]:
-        required = {"model_selection", "system_prompt"}
+        required = {"model_selection", "system_prompt", "prompt"}
+        if not self._uses_allowed_tools(request):
+            required.add("agent_isolation")
         if request.permission in {PermissionMode.READ_ONLY, PermissionMode.PROPOSE_ONLY}:
             required.add("approval_plan")
         elif request.permission is PermissionMode.WORKSPACE_WRITE:
@@ -108,6 +167,32 @@ class GigaCodeQwenAdapter:
         elif request.permission is PermissionMode.FULL_ACCESS:
             required.update({"approval_auto_edit", "allowed_tools"})
         return required
+
+    @staticmethod
+    def _system_prompt(request: AgentRequest) -> str:
+        return (
+            f"{request.system_prompt.rstrip()}\n\n"
+            "## Runtime output contract\n"
+            "Return exactly one JSON object and no prose. The object must validate "
+            "against this JSON Schema. Do not wrap the object in Markdown unless "
+            "the CLI does so automatically.\n"
+            f"{canonical_json(request.output_schema)}"
+        )
+
+    def _captured_error(
+        self,
+        error: AgentRuntimeError,
+        *,
+        process: ProcessResult,
+        output_format: str,
+    ) -> AgentExecutionError:
+        return AgentExecutionError(
+            error,
+            process=process,
+            stdout=self._redactor.redact_text(process.stdout),
+            stderr=self._redactor.redact_text(process.stderr),
+            output_format=output_format,
+        )
 
     def _command(
         self,
@@ -120,7 +205,7 @@ class GigaCodeQwenAdapter:
             "--model",
             request.model,
             "--system-prompt",
-            request.system_prompt,
+            self._system_prompt(request),
             "--approval-mode",
         ]
         if request.permission in {PermissionMode.READ_ONLY, PermissionMode.PROPOSE_ONLY}:
@@ -132,22 +217,29 @@ class GigaCodeQwenAdapter:
         if request.permission is PermissionMode.FULL_ACCESS and request.allowed_tools:
             argv.extend(["--allowed-tools", ",".join(request.allowed_tools)])
 
-        if capabilities.stream_input and capabilities.stream_output:
+        if not self._uses_allowed_tools(request):
             argv.extend(
                 [
-                    "--input-format",
-                    "stream-json",
-                    "--output-format",
-                    "stream-json",
+                    "--extensions",
+                    "none",
+                    "--max-session-turns",
+                    str(_MAX_AGENT_TURNS),
+                    "--core-tools",
+                    _NO_TOOL_CORE_SENTINEL,
+                    "--allowed-mcp-server-names",
+                    "",
+                    "--exclude-tools",
+                    ",".join(_NO_TOOL_EXCLUSIONS),
                 ]
             )
-            input_text = canonical_json(
-                {"type": "message", "role": "user", "content": request.prompt}
-            )
-            return argv, input_text + "\n", "stream-json"
+
+        argv.extend(["--prompt", request.prompt])
+        if capabilities.stream_output:
+            argv.extend(["--output-format", "stream-json"])
+            return argv, "", "stream-json"
 
         capabilities.require({"json_output"})
-        argv.extend(["--output-format", "json", request.prompt])
+        argv.extend(["--output-format", "json"])
         return argv, "", "json"
 
     def _validate_output(
@@ -189,39 +281,54 @@ class GigaCodeQwenAdapter:
         )
         redacted_stderr = self._redactor.redact_text(process.stderr)
         if process.timed_out:
-            raise AgentRuntimeError(
-                ErrorCode.PROCESS_TIMEOUT,
-                "GigaCode agent process timed out",
-                details={
-                    "pid": process.pid,
-                    "forced_kill": process.forced_kill,
-                    "stderr": redacted_stderr,
-                },
-                retryable=True,
+            raise self._captured_error(
+                AgentRuntimeError(
+                    ErrorCode.PROCESS_TIMEOUT,
+                    "GigaCode agent process timed out",
+                    details={
+                        "pid": process.pid,
+                        "forced_kill": process.forced_kill,
+                        "stderr": redacted_stderr,
+                    },
+                    retryable=True,
+                ),
+                process=process,
+                output_format=output_format,
             )
         if process.returncode != 0:
-            raise AgentRuntimeError(
-                ErrorCode.PROCESS_ERROR,
-                f"GigaCode agent process exited with code {process.returncode}",
-                details={
-                    "returncode": process.returncode,
-                    "stderr": redacted_stderr,
-                    "stdout_truncated": process.stdout_truncated,
-                    "stderr_truncated": process.stderr_truncated,
-                },
-                retryable=process.returncode == 75,
+            raise self._captured_error(
+                AgentRuntimeError(
+                    ErrorCode.PROCESS_ERROR,
+                    f"GigaCode agent process exited with code {process.returncode}",
+                    details={
+                        "returncode": process.returncode,
+                        "stderr": redacted_stderr,
+                        "stdout_truncated": process.stdout_truncated,
+                        "stderr_truncated": process.stderr_truncated,
+                    },
+                    retryable=process.returncode == 75,
+                ),
+                process=process,
+                output_format=output_format,
             )
 
         events: tuple[Mapping[str, object], ...] = ()
-        if output_format == "stream-json":
-            parser = StreamJsonParser()
-            parser.feed(process.stdout)
-            parsed: ParsedStream = parser.finish()
-            output = parsed.result
-            events = parsed.events
-        else:
-            output = parse_json_result(process.stdout)
-        self._validate_output(output, request.output_schema)
+        try:
+            if output_format == "stream-json":
+                parser = StreamJsonParser()
+                parser.feed(process.stdout)
+                parsed: ParsedStream = parser.finish()
+                output = parsed.result
+                events = parsed.events
+            else:
+                output = parse_json_result(process.stdout)
+            self._validate_output(output, request.output_schema)
+        except AgentRuntimeError as error:
+            raise self._captured_error(
+                error,
+                process=process,
+                output_format=output_format,
+            ) from error
         return AgentExecutionResult(
             output=MappingProxyType(dict(cast(Mapping[str, Any], output))),
             events=events,

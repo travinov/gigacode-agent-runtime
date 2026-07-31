@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from gigacode_agent_runtime.adapters.gigacode_qwen import (
+    AgentExecutionError,
     AgentRequest,
     GigaCodeQwenAdapter,
 )
@@ -100,6 +101,39 @@ async def test_workspace_write_uses_sandbox_and_workspace_cwd(tmp_path: Path) ->
 
 
 @pytest.mark.anyio
+async def test_adapter_uses_prompt_stream_output_schema_and_no_tool_isolation(
+    tmp_path: Path,
+) -> None:
+    adapter = _adapter(tmp_path, "success")
+    request = _request(tmp_path)
+    request = AgentRequest(
+        model=request.model,
+        system_prompt=request.system_prompt,
+        prompt=request.prompt,
+        permission=request.permission,
+        allowed_tools=(),
+        workspace=request.workspace,
+        output_schema=request.output_schema,
+    )
+
+    await adapter.run_agent(request, timeout_seconds=2)
+
+    traces = [
+        json.loads(line) for line in (tmp_path / "trace.jsonl").read_text().splitlines()
+    ]
+    invocation = traces[-1]
+    argv = invocation["argv"]
+    assert "--prompt" in argv
+    assert "--input-format" not in argv
+    assert "--output-format" in argv
+    assert "--extensions" in argv
+    assert "--core-tools" in argv
+    assert "--allowed-mcp-server-names" in argv
+    assert invocation["stdin_empty"] is True
+    assert invocation["system_prompt_has_output_contract"] is True
+
+
+@pytest.mark.anyio
 async def test_executable_path_with_spaces_is_not_shell_interpreted(tmp_path: Path) -> None:
     source = Path(__file__).parents[1] / "fixtures" / "fake_gigacode"
     copied = tmp_path / "fake cli with spaces"
@@ -147,6 +181,41 @@ async def test_invalid_json_is_never_returned_as_agent_output(tmp_path: Path) ->
         await adapter.run_agent(_request(tmp_path), timeout_seconds=2)
 
     assert captured.value.code is ErrorCode.STEP_OUTPUT_INVALID
+    assert isinstance(captured.value, AgentExecutionError)
+    assert captured.value.stdout == "{invalid-json\n"
+    assert captured.value.stderr == ""
+
+
+@pytest.mark.anyio
+async def test_schema_validation_error_retains_corporate_stream_capture(
+    tmp_path: Path,
+) -> None:
+    adapter = _adapter(tmp_path, "success")
+    request = _request(tmp_path)
+    invalid_contract = AgentRequest(
+        model=request.model,
+        system_prompt=request.system_prompt,
+        prompt=request.prompt,
+        permission=request.permission,
+        allowed_tools=request.allowed_tools,
+        workspace=request.workspace,
+        output_schema={
+            "type": "object",
+            "required": ["missing"],
+            "properties": {"missing": {"type": "string"}},
+        },
+    )
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        await adapter.run_agent(invalid_contract, timeout_seconds=2)
+
+    assert captured.value.code is ErrorCode.STEP_OUTPUT_INVALID
+    assert isinstance(captured.value, AgentExecutionError)
+    assert '"type":"result"' in captured.value.stdout
+    terminal = json.loads(captured.value.stdout.splitlines()[-1])
+    assert terminal["result"] == (
+        '\n\n```json\n{"summary":"fake success","approved":true}\n```'
+    )
 
 
 @pytest.mark.anyio

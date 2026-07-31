@@ -87,6 +87,12 @@ agent-runtime scenario validate \
 5. дождаться terminal status через `get_run_status`;
 6. получить `get_run_events` и `get_run_result`.
 
+У `corporate-sequential` дополнительно проверьте, что оба шага завершились, а
+не только вернули `run_id`. В событиях не должно быть
+`GigaCode stream ended without a result event`. При ошибке сразу сохраните
+результат `get_run_artifacts`: RC9 публикует `stdout.jsonl` и `stderr.txt` для
+каждой неуспешной попытки.
+
 Для parallel дополнительно вызовите `open_dashboard`. В Web UI обе ветви первой
 wave должны работать одновременно, а synthesize — стартовать после обеих.
 Зафиксируйте run IDs и screenshot без корпоративных данных.

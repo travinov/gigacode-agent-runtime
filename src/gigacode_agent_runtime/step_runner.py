@@ -10,6 +10,7 @@ import anyio
 
 from .adapters.capabilities import GigaCodeCapabilities
 from .adapters.gigacode_qwen import (
+    AgentExecutionError,
     AgentExecutionResult,
     AgentRequest,
 )
@@ -95,6 +96,32 @@ class StepRunner:
         self._states = states
         self._events = events
         self._artifacts = artifacts
+
+    def _persist_failed_process(
+        self,
+        error: AgentRuntimeError,
+        *,
+        instance_id: str,
+        attempt: int,
+    ) -> None:
+        if not isinstance(error, AgentExecutionError):
+            return
+        directory = f"steps/{instance_id}/attempt-{attempt}"
+        stdout_name = "stdout.jsonl" if error.output_format == "stream-json" else "stdout.json"
+        self._artifacts.write_text(
+            f"{directory}/{stdout_name}",
+            error.stdout,
+            mime_type=(
+                "application/x-ndjson"
+                if error.output_format == "stream-json"
+                else "application/json"
+            ),
+        )
+        self._artifacts.write_text(
+            f"{directory}/stderr.txt",
+            error.stderr,
+            mime_type="text/plain",
+        )
 
     def _resolve(
         self,
@@ -322,6 +349,11 @@ class StepRunner:
                     cancelled=True,
                 )
             except AgentRuntimeError as error:
+                self._persist_failed_process(
+                    error,
+                    instance_id=instance_id,
+                    attempt=attempt,
+                )
                 failure = classify_failure(error)
                 if should_retry(
                     step.retry,

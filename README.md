@@ -555,6 +555,14 @@ inputs:
 но сохраняются как разные намерения сценария. Ограничение `allowed_tools`
 применяется адаптером только к `full_access`.
 
+Если у агента нет эффективного full-access `allowed_tools`, runtime запускает
+его в изолированном контексте: отключает наследуемые extensions, глобальные MCP,
+skills и core tools. Это предотвращает рекурсивный вызов самого runtime и не
+расходует контекст модели на схемы посторонних инструментов. Для такого запуска
+GigaCode CLI должен поддерживать `--extensions`, `--max-session-turns`,
+`--core-tools`, `--allowed-mcp-server-names` и `--exclude-tools`; отсутствие
+любой из этих возможностей приводит к fail-closed `CAPABILITY_UNAVAILABLE`.
+
 Роль можно вынести в файл рядом со сценарием:
 
 ```yaml
@@ -1223,6 +1231,22 @@ Model ID сценария отсутствует в непустом
 Модель вернула результат, не соответствующий `output_schema`. Упростите и
 уточните schema/system prompt либо добавьте ограниченный retry на
 `invalid_output`.
+
+Runtime сам добавляет точный `output_schema` в system prompt агента. Корпоративный
+GigaCode/Qwen может вернуть итоговый объект внутри строкового Markdown-блока
+`json`; такой точный блок поддерживается. Текст до или после JSON намеренно не
+извлекается.
+
+При ошибке дочернего процесса проверьте `get_run_artifacts`. Для каждой
+неуспешной попытки сохраняются redacted-файлы:
+
+```text
+runs/RUN_ID/artifacts/steps/STEP/attempt-N/stdout.jsonl
+runs/RUN_ID/artifacts/steps/STEP/attempt-N/stderr.txt
+```
+
+Файлы создаются даже при пустом stderr. Это позволяет отличить ошибку transport,
+отсутствующий terminal `result` и ошибку локальной проверки `output_schema`.
 
 ### Loop не завершается
 

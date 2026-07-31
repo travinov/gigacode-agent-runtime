@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.0-rc.9] - 2026-07-31
+
+### Fixed
+
+- Use the verified GigaCode/Qwen Code 0.13.1 non-interactive contract:
+  `--prompt` input with `--output-format stream-json`, without the incompatible
+  stream-JSON stdin message envelope.
+- Normalize terminal `result` payloads returned as an object, a JSON-encoded
+  string, or an exact Markdown JSON fence, while rejecting surrounding prose.
+- Append the concrete step `output_schema` to every child agent system prompt
+  before validating the returned object locally.
+- Isolate agents without an effective full-access tool allowlist from inherited
+  extensions, global MCP servers, skills, and core tools.
+- Preserve redacted stdout and stderr as per-attempt artifacts when a child
+  process exits, times out, emits invalid JSON, or fails output-schema validation.
+
 ## [1.0.0-rc.8] - 2026-07-30
 
 ### Fixed
