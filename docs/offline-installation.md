@@ -45,10 +45,11 @@ cd gigacode-agent-runtime-VERSION-macos-x86_64
 project wheel, поэтому release candidate можно безопасно обновлять с
 сохранением rollback. При сбое до commit выполняется rollback.
 
-На чистой установке installer также размещает `config.yaml`, пять сценариев
-`corporate-*` в `~/.gigacode/agent-runtime/` и пример переиспользуемого агента
-`~/.gigacode/agents/business-analyst-proactive.md`. Существующие файлы с теми
-же именами сохраняются без изменений.
+На чистой установке installer также размещает `config.yaml`, шесть сценариев
+`corporate-*` в `~/.gigacode/agent-runtime/`, пример переиспользуемого агента
+`~/.gigacode/agents/business-analyst-proactive.md` и безопасный Skill
+`~/.gigacode/skills/runtime-skill-probe/SKILL.md`. Существующие файлы с теми же
+именами сохраняются без изменений.
 
 После установки:
 
@@ -56,6 +57,7 @@ project wheel, поэтому release candidate можно безопасно о
 agent-runtime diagnose --json
 agent-runtime scenarios list --json
 agent-runtime agents list --json
+agent-runtime skills list --json
 gigacode mcp list
 ```
 

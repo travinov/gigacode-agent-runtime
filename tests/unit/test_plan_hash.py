@@ -6,6 +6,7 @@ from gigacode_agent_runtime.agent_catalog import AgentProfileCatalog
 from gigacode_agent_runtime.config import load_config
 from gigacode_agent_runtime.plan_compiler import compile_plan
 from gigacode_agent_runtime.scenario_loader import load_scenario_file
+from gigacode_agent_runtime.skill_catalog import SkillProfileCatalog
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "scenarios"
 
@@ -123,3 +124,44 @@ def test_reusable_agent_change_changes_plan_hash(tmp_path: Path) -> None:
 
     assert first.plan_hash != second.plan_hash
     assert first.agents["analyst"].source_hash != second.agents["analyst"].source_hash
+
+
+def test_selected_skill_change_changes_plan_hash(tmp_path: Path) -> None:
+    skills = tmp_path / "skills"
+    skill_dir = skills / "requirements-review"
+    skill_dir.mkdir(parents=True)
+    skill = skill_dir / "SKILL.md"
+    scenario_path = tmp_path / "skill-ref.yaml"
+    scenario_path.write_text(
+        (FIXTURES / "minimal-valid.yaml").read_text().replace(
+            "    permissions: read_only\n",
+            "    permissions: read_only\n"
+            "    skill_refs: [gigacode:requirements-review]\n",
+        )
+    )
+
+    def compile_with_instructions(instructions: str):
+        skill.write_text(
+            "---\n"
+            "name: requirements-review\n"
+            "description: Review requirements.\n"
+            "---\n\n"
+            f"{instructions}\n"
+        )
+        return compile_plan(
+            load_scenario_file(
+                scenario_path,
+                skill_catalog=SkillProfileCatalog(skills),
+            ),
+            load_config(tmp_path / "missing.yaml", home=tmp_path / "home"),
+            inputs={"task": "inspect"},
+            workspace=tmp_path,
+        )
+
+    first = compile_with_instructions("First Skill instructions.")
+    second = compile_with_instructions("Second Skill instructions.")
+
+    assert first.plan_hash != second.plan_hash
+    assert first.agents["analyst"].skills[0].source_hash != (
+        second.agents["analyst"].skills[0].source_hash
+    )

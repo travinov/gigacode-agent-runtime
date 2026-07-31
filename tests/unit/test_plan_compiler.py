@@ -11,6 +11,7 @@ from gigacode_agent_runtime.errors import AgentRuntimeError, ErrorCode
 from gigacode_agent_runtime.plan_compiler import compile_plan, execution_plan_to_document
 from gigacode_agent_runtime.scenario_loader import load_scenario_file
 from gigacode_agent_runtime.schema_registry import validate_document
+from gigacode_agent_runtime.skill_catalog import SkillProfileCatalog
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "scenarios"
 
@@ -174,3 +175,58 @@ def test_agent_ref_resolves_prompt_tools_and_provenance(tmp_path: Path) -> None:
     assert agent.allowed_tools == ("read_file",)
     assert agent.source_ref == "gigacode:reusable-analyst"
     assert agent.source_hash == plan.resource_hashes["gigacode:reusable-analyst"]
+
+
+def test_skill_refs_inject_only_selected_skill_and_record_provenance(
+    tmp_path: Path,
+) -> None:
+    skills = tmp_path / "home" / ".gigacode" / "skills"
+    selected = skills / "requirements-review"
+    unselected = skills / "unselected"
+    selected.mkdir(parents=True)
+    unselected.mkdir()
+    (selected / "SKILL.md").write_text(
+        "---\n"
+        "name: requirements-review\n"
+        "description: Review requirements.\n"
+        "---\n\n"
+        "SELECTED_SKILL_INSTRUCTION\n"
+    )
+    (unselected / "SKILL.md").write_text(
+        "---\n"
+        "name: unselected\n"
+        "description: Must remain unavailable.\n"
+        "---\n\n"
+        "UNSELECTED_SKILL_INSTRUCTION\n"
+    )
+    scenario_path = tmp_path / "skill-ref.yaml"
+    scenario_path.write_text(
+        (FIXTURES / "minimal-valid.yaml").read_text().replace(
+            "    permissions: read_only\n",
+            "    permissions: read_only\n"
+            "    skill_refs: [gigacode:requirements-review]\n",
+        )
+    )
+    loaded = load_scenario_file(
+        scenario_path,
+        skill_catalog=SkillProfileCatalog(skills),
+    )
+
+    plan = compile_plan(
+        loaded,
+        _config(tmp_path),
+        inputs={"task": "inspect"},
+        workspace=tmp_path,
+    )
+    agent = plan.agents["analyst"]
+
+    assert "SELECTED_SKILL_INSTRUCTION" in agent.system_prompt
+    assert "UNSELECTED_SKILL_INSTRUCTION" not in agent.system_prompt
+    assert [skill.reference for skill in agent.skills] == [
+        "gigacode:requirements-review"
+    ]
+    assert agent.skills[0].source_hash == plan.resource_hashes[
+        "skill:gigacode:requirements-review"
+    ]
+    assert "tool_exclusion" in plan.capability_requirements
+    validate_document("execution-plan-v1", execution_plan_to_document(plan))

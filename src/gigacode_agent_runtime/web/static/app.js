@@ -132,7 +132,8 @@ function renderPlan(status) {
     const title = document.createElement("strong");
     title.textContent = name;
     const meta = document.createElement("span");
-    meta.textContent = `${agent.model || "runtime"} · ${agent.permissions || "controller"} · attempt ${stepState.attempt}`;
+    const skills = (agent.skills || []).map((skill) => skill.reference).join(", ");
+    meta.textContent = `${agent.model || "runtime"} · ${agent.permissions || "controller"} · attempt ${stepState.attempt}${skills ? ` · Skills: ${skills}` : ""}`;
     description.append(title, meta);
     row.append(description, statusBadge(stepState.status));
     steps.append(row);

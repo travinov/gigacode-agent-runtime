@@ -8,6 +8,7 @@ from pathlib import Path
 from .agent_catalog import AgentProfileCatalog
 from .config import EffectiveConfig
 from .scenario_loader import ScenarioCatalog
+from .skill_catalog import SkillProfileCatalog
 
 
 def builtin_catalog_root() -> Path:
@@ -25,14 +26,20 @@ def create_scenario_catalog(
     workspace_root: Path | None = None,
 ) -> ScenarioCatalog:
     agent_catalog = create_agent_profile_catalog(config)
+    skill_catalog = create_skill_profile_catalog(config)
     return ScenarioCatalog(
         builtin_dir=builtin_scenarios_dir(),
         user_dir=config.paths.user_scenarios,
         project_dir=project_dir,
         workspace_root=workspace_root,
         agent_catalog=agent_catalog,
+        skill_catalog=skill_catalog,
     )
 
 
 def create_agent_profile_catalog(config: EffectiveConfig) -> AgentProfileCatalog:
     return AgentProfileCatalog(config.paths.home / ".gigacode" / "agents")
+
+
+def create_skill_profile_catalog(config: EffectiveConfig) -> SkillProfileCatalog:
+    return SkillProfileCatalog(config.paths.home / ".gigacode" / "skills")

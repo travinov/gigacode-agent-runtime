@@ -26,6 +26,7 @@ from .domain import (
     RetryPolicy,
     ScenarioMetadata,
     ScenarioSource,
+    SkillDefinition,
 )
 from .errors import AgentRuntimeError, ErrorCode
 from .hashing import json_object, sha256_digest
@@ -158,6 +159,46 @@ def _compile_agents(
             profile_tools = tuple(
                 tool for tool in profile.tools if tool not in profile.disallowed_tools
             )
+        skills: list[SkillDefinition] = []
+        skill_sections: list[str] = []
+        for raw_skill_ref in cast(list[object], raw.get("skill_refs", [])):
+            skill_ref = str(raw_skill_ref)
+            skill = scenario.skill_profiles.get(skill_ref)
+            if skill is None:
+                raise AgentRuntimeError(
+                    ErrorCode.SKILL_PROFILE_NOT_FOUND,
+                    f"GigaCode Skill was not snapshotted: {skill_ref}",
+                    details={"agent": name, "skill_ref": skill_ref},
+                )
+            skill_hash = sha256_digest(skill.raw_content)
+            skills.append(
+                SkillDefinition(
+                    name=skill.name,
+                    reference=skill.reference,
+                    description=skill.description,
+                    base_dir=skill.base_dir,
+                    source_hash=skill_hash,
+                )
+            )
+            skill_sections.append(
+                f"### Skill: {skill.name}\n"
+                f"Reference: {skill.reference}\n"
+                f"Base directory: {skill.base_dir}\n"
+                f"Description: {skill.description}\n\n"
+                f"{skill.instructions}"
+            )
+        if skill_sections:
+            system_prompt = (
+                f"{system_prompt.rstrip()}\n\n"
+                "## Runtime-selected GigaCode Skills\n"
+                "Only the Skills listed in this section are authorized for this "
+                "agent. Apply a Skill when it is relevant to the task. Do not load "
+                "or invoke any other Skill. Resolve relative paths in a Skill from "
+                "its declared Base directory. If the current permission mode does "
+                "not provide a required tool, follow the available instructions but "
+                "do not attempt the prohibited operation.\n\n"
+                + "\n\n---\n\n".join(skill_sections)
+            )
         agents[name] = AgentDefinition(
             name=name,
             model=model,
@@ -170,6 +211,7 @@ def _compile_agents(
             ),
             source_ref=source_ref,
             source_hash=source_hash,
+            skills=tuple(skills),
         )
     return MappingProxyType(agents)
 
@@ -313,6 +355,8 @@ def _capability_requirements(agents: Mapping[str, AgentDefinition]) -> tuple[str
         capabilities.update({"approval_auto_edit", "sandbox"})
     if PermissionMode.FULL_ACCESS in permissions:
         capabilities.update({"approval_auto_edit", "allowed_tools"})
+    if any(agent.skills for agent in agents.values()):
+        capabilities.add("tool_exclusion")
     return tuple(sorted(capabilities))
 
 
@@ -502,6 +546,19 @@ def execution_plan_from_document(document: Mapping[str, Any]) -> ExecutionPlan:
                         str(raw["source_hash"])
                         if raw.get("source_hash") is not None
                         else None
+                    ),
+                    skills=tuple(
+                        SkillDefinition(
+                            name=str(item["name"]),
+                            reference=str(item["reference"]),
+                            description=str(item["description"]),
+                            base_dir=Path(str(item["base_dir"])),
+                            source_hash=str(item["source_hash"]),
+                        )
+                        for item in cast(
+                            Sequence[Mapping[str, Any]],
+                            raw.get("skills", []),
+                        )
                     ),
                 )
                 for name, raw in agents_raw.items()

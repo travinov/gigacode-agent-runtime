@@ -78,6 +78,15 @@ class ScenarioMetadata:
 
 
 @dataclass(frozen=True, slots=True)
+class SkillDefinition:
+    name: str
+    reference: str
+    description: str
+    base_dir: Path
+    source_hash: str
+
+
+@dataclass(frozen=True, slots=True)
 class AgentDefinition:
     name: str
     model: str
@@ -86,6 +95,7 @@ class AgentDefinition:
     allowed_tools: tuple[str, ...] = ()
     source_ref: str | None = None
     source_hash: str | None = None
+    skills: tuple[SkillDefinition, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

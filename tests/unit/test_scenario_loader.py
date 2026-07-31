@@ -7,6 +7,7 @@ import pytest
 from gigacode_agent_runtime.agent_catalog import AgentProfileCatalog
 from gigacode_agent_runtime.errors import AgentRuntimeError, ErrorCode
 from gigacode_agent_runtime.scenario_loader import ScenarioCatalog, load_scenario_file
+from gigacode_agent_runtime.skill_catalog import SkillProfileCatalog
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "scenarios"
 
@@ -148,3 +149,54 @@ def test_agent_ref_requires_configured_catalog(tmp_path: Path) -> None:
         load_scenario_file(scenario)
 
     assert captured.value.code is ErrorCode.AGENT_PROFILE_NOT_FOUND
+
+
+def test_skill_refs_are_snapshotted_from_native_catalog(tmp_path: Path) -> None:
+    skills = tmp_path / "home" / ".gigacode" / "skills"
+    skill_dir = skills / "requirements-review"
+    skill_dir.mkdir(parents=True)
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(
+        "---\n"
+        "name: requirements-review\n"
+        "description: Review requirements.\n"
+        "---\n\n"
+        "Return a gap analysis.\n"
+    )
+    scenario = tmp_path / "scenario.yaml"
+    scenario.write_text(
+        _scenario_text("with-skill-ref", "with skill ref").replace(
+            "    system_prompt: Analyze.\n",
+            "    system_prompt: Analyze.\n"
+            "    skill_refs: [gigacode:requirements-review]\n",
+        )
+    )
+
+    loaded = load_scenario_file(
+        scenario,
+        skill_catalog=SkillProfileCatalog(skills),
+    )
+    skill_file.write_text("changed after snapshot")
+
+    assert loaded.skill_profiles["gigacode:requirements-review"].instructions == (
+        "Return a gap analysis."
+    )
+    assert loaded.resources["skill:gigacode:requirements-review"].content.startswith(
+        "---"
+    )
+
+
+def test_skill_refs_require_configured_catalog(tmp_path: Path) -> None:
+    scenario = tmp_path / "scenario.yaml"
+    scenario.write_text(
+        _scenario_text("missing-skill-catalog", "missing skill catalog").replace(
+            "    system_prompt: Analyze.\n",
+            "    system_prompt: Analyze.\n"
+            "    skill_refs: [gigacode:requirements-review]\n",
+        )
+    )
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        load_scenario_file(scenario)
+
+    assert captured.value.code is ErrorCode.SKILL_PROFILE_NOT_FOUND

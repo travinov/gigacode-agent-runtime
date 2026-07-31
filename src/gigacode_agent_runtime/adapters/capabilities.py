@@ -25,6 +25,7 @@ class GigaCodeCapabilities:
     stream_output: bool
     agent_isolation: bool
     mcp: bool
+    tool_exclusion: bool = False
 
     @classmethod
     def empty(cls, executable: Path) -> GigaCodeCapabilities:
@@ -41,6 +42,7 @@ class GigaCodeCapabilities:
             json_output=False,
             stream_output=False,
             agent_isolation=False,
+            tool_exclusion=False,
             mcp=False,
         )
 
@@ -58,6 +60,7 @@ class GigaCodeCapabilities:
             "json_output": self.json_output,
             "stream_output": self.stream_output,
             "agent_isolation": self.agent_isolation,
+            "tool_exclusion": self.tool_exclusion,
             "mcp": self.mcp,
         }
         return checks.get(name, False)
@@ -89,6 +92,7 @@ class GigaCodeCapabilities:
             "json_output": self.json_output,
             "stream_output": self.stream_output,
             "agent_isolation": self.agent_isolation,
+            "tool_exclusion": self.tool_exclusion,
             "mcp": self.mcp,
         }
 
@@ -124,6 +128,7 @@ def parse_capabilities(
                 "--exclude-tools",
             )
         ),
+        tool_exclusion="--exclude-tools" in help_text,
         mcp="mcp" in mcp_help_text.lower(),
     )
 

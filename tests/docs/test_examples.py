@@ -10,6 +10,7 @@ from gigacode_agent_runtime.config import load_config
 from gigacode_agent_runtime.errors import AgentRuntimeError, ErrorCode
 from gigacode_agent_runtime.plan_compiler import compile_plan
 from gigacode_agent_runtime.scenario_loader import load_scenario_file
+from gigacode_agent_runtime.skill_catalog import SkillProfileCatalog
 
 ROOT = Path(__file__).parents[2]
 PUBLIC_DOCS = (
@@ -57,12 +58,13 @@ def test_corporate_profile_is_ready_to_plan_without_edits(
 
     assert set(config.gigacode.model_allowlist) == allowed_models
     assert config.permissions.allow_full_access is True
-    assert len(scenarios) == 5
+    assert len(scenarios) == 6
     for path in scenarios:
         plan = compile_plan(
             load_scenario_file(
                 path,
                 agent_catalog=AgentProfileCatalog(profile / "agents"),
+                skill_catalog=SkillProfileCatalog(profile / "skills"),
             ),
             config,
             inputs={"task": "corporate profile test"},

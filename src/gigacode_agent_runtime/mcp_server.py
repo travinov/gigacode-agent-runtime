@@ -38,6 +38,13 @@ TOOL_DESCRIPTIONS = {
         "Return one reusable GigaCode agent profile, including its system prompt, "
         "metadata, model hint, and tool declarations."
     ),
+    "list_skill_profiles": (
+        "List reusable native GigaCode Skills discovered in ~/.gigacode/skills."
+    ),
+    "describe_skill_profile": (
+        "Return one reusable GigaCode Skill, including its instructions, metadata, "
+        "source directory, and invocation controls."
+    ),
     "validate_scenario": (
         "Validate a named scenario or inline_scenario_yaml without executing it."
     ),
@@ -148,6 +155,8 @@ def create_mcp_server(
             "For inline scenarios, pass YAML through inline_scenario_yaml. "
             "Use list_agent_profiles to discover reusable agents and reference "
             "them in scenario agents with agent_ref: gigacode:<name>. "
+            "Use list_skill_profiles to discover installed Skills and grant only "
+            "the required ones to each agent with skill_refs: [gigacode:<name>]. "
             "Never ask a user to invent an idempotency key: generate one for a "
             "new start action and reuse it only when retrying that exact action. "
             "Do not fall back to Shell when an MCP call fails."
@@ -194,6 +203,19 @@ def create_mcp_server(
         ],
     ) -> dict[str, object]:
         return await tools.describe_agent_profile(agent_name)
+
+    async def describe_skill_profile_tool(
+        skill_name: Annotated[
+            str,
+            Field(
+                description=(
+                    "Native GigaCode Skill name or gigacode:<name> reference from "
+                    "list_skill_profiles."
+                )
+            ),
+        ],
+    ) -> dict[str, object]:
+        return await tools.describe_skill_profile(skill_name)
 
     async def plan_scenario_tool(
         workspace: Annotated[
@@ -317,6 +339,16 @@ def create_mcp_server(
         description=TOOL_DESCRIPTIONS["describe_agent_profile"],
         structured_output=True,
     )(describe_agent_profile_tool)
+    server.tool(
+        name="list_skill_profiles",
+        description=TOOL_DESCRIPTIONS["list_skill_profiles"],
+        structured_output=True,
+    )(tools.list_skill_profiles)
+    server.tool(
+        name="describe_skill_profile",
+        description=TOOL_DESCRIPTIONS["describe_skill_profile"],
+        structured_output=True,
+    )(describe_skill_profile_tool)
     server.tool(
         name="validate_scenario",
         description=TOOL_DESCRIPTIONS["validate_scenario"],

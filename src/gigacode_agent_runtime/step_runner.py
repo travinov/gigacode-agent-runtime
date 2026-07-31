@@ -301,6 +301,7 @@ class StepRunner:
                     "model": agent.model,
                     "attempt": attempt,
                     "iteration": iteration,
+                    "skill_refs": [skill.reference for skill in agent.skills],
                 },
                 step_instance_id=instance_id,
             )
@@ -314,6 +315,7 @@ class StepRunner:
                         allowed_tools=agent.allowed_tools,
                         workspace=self._plan.workspace,
                         output_schema=step.output_schema,
+                        skill_refs=tuple(skill.reference for skill in agent.skills),
                     ),
                     timeout_seconds=step.timeout_seconds
                     if step.timeout_seconds is not None
@@ -436,6 +438,7 @@ class StepRunner:
                     "step": step.name,
                     "attempt": attempt,
                     "iteration": iteration,
+                    "skill_refs": [skill.reference for skill in agent.skills],
                     "duration_seconds": result.process.duration_seconds,
                 },
                 step_instance_id=instance_id,

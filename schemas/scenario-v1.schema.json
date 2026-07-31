@@ -154,6 +154,15 @@
             "minLength": 1
           },
           "uniqueItems": true
+        },
+        "skill_refs": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "pattern": "^gigacode:[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "uniqueItems": true
         }
       },
       "oneOf": [

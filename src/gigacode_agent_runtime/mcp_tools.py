@@ -12,7 +12,11 @@ import anyio
 from .adapter_factory import create_gigacode_adapter
 from .agent_catalog import AgentProfile
 from .approval_store import ApprovalStore
-from .catalog import create_agent_profile_catalog, create_scenario_catalog
+from .catalog import (
+    create_agent_profile_catalog,
+    create_scenario_catalog,
+    create_skill_profile_catalog,
+)
 from .config import EffectiveConfig
 from .diagnostics import diagnose_runtime
 from .domain import RunStatus
@@ -27,6 +31,7 @@ from .runtime_service import RuntimeService
 from .scenario_loader import LoadedScenario, load_scenario_file
 from .scheduler import DagScheduler
 from .serialization import atomic_write_text
+from .skill_catalog import SkillProfile
 from .state_store import StateStore, run_state_to_document
 from .step_runner import AgentAdapter
 
@@ -51,6 +56,7 @@ class McpToolService:
         self._started = False
         self._project_scenarios = project_scenarios
         self._agent_catalog = create_agent_profile_catalog(config)
+        self._skill_catalog = create_skill_profile_catalog(config)
         self._catalog = create_scenario_catalog(
             config,
             project_dir=project_scenarios,
@@ -114,7 +120,11 @@ class McpToolService:
         path = self.config.runtime.data_dir / "inline-scenarios" / f"{digest}.yaml"
         if not path.exists():
             atomic_write_text(path, text)
-        return load_scenario_file(path, agent_catalog=self._agent_catalog)
+        return load_scenario_file(
+            path,
+            agent_catalog=self._agent_catalog,
+            skill_catalog=self._skill_catalog,
+        )
 
     async def _ensure_dashboard(self, run_id: str | None) -> str:
         if self._dashboard_url is not None:
@@ -245,6 +255,51 @@ class McpToolService:
             )
         )
 
+    @staticmethod
+    def _skill_profile_document(
+        profile: SkillProfile,
+        *,
+        include_instructions: bool,
+    ) -> dict[str, object]:
+        document: dict[str, object] = {
+            "name": profile.name,
+            "skill_ref": profile.reference,
+            "description": profile.description,
+            "source_path": str(profile.source_path),
+            "base_dir": str(profile.base_dir),
+            "priority": profile.priority,
+            "user_invocable": profile.user_invocable,
+            "disable_model_invocation": profile.disable_model_invocation,
+            "paths": list(profile.paths),
+        }
+        if include_instructions:
+            document["instructions"] = profile.instructions
+        return document
+
+    async def list_skill_profiles(self) -> dict[str, object]:
+        def operation() -> dict[str, object]:
+            profiles = [
+                self._skill_profile_document(profile, include_instructions=False)
+                for profile in sorted(
+                    self._skill_catalog.discover().values(),
+                    key=lambda item: item.name,
+                )
+            ]
+            return {
+                "catalog_root": str(self._skill_catalog.root),
+                "skills": profiles,
+            }
+
+        return await public_result(operation)
+
+    async def describe_skill_profile(self, skill_name: str) -> dict[str, object]:
+        return await public_result(
+            lambda: self._skill_profile_document(
+                self._skill_catalog.load(skill_name),
+                include_instructions=True,
+            )
+        )
+
     async def describe_scenario(self, scenario_name: str) -> dict[str, object]:
         def operation() -> dict[str, object]:
             scenario = self._catalog.load(scenario_name)
@@ -278,6 +333,13 @@ class McpToolService:
                         key=lambda item: item.name,
                     )
                 ],
+                "resolved_skill_refs": [
+                    self._skill_profile_document(profile, include_instructions=False)
+                    for profile in sorted(
+                        scenario.skill_profiles.values(),
+                        key=lambda item: item.name,
+                    )
+                ],
             }
 
         return await public_result(operation)
@@ -297,6 +359,7 @@ class McpToolService:
                 "name": scenario.name,
                 "resource_count": len(scenario.resources),
                 "agent_refs": sorted(scenario.agent_profiles),
+                "skill_refs": sorted(scenario.skill_profiles),
             }
 
         return await public_result(operation)

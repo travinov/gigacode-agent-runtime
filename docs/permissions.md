@@ -17,6 +17,21 @@ Permission задаётся отдельно для каждого агента 
 Qwen. Режим `plan` не применяется к дочерним структурированным агентам, потому
 что он требует интерактивный `exit_plan_mode`.
 
+## Skills и permissions
+
+`skill_refs` не повышает права агента. Runtime внедряет текст выбранных
+`SKILL.md` в system prompt и блокирует нативный `skill`-tool, чтобы не произошло
+автоматическое наследование остальных Skills пользователя.
+
+- `read_only` и `propose_only`: только инструкции, без scripts, filesystem и MCP;
+- `workspace_write`: инструкции плюс разрешённые sandbox-операции в workspace;
+- `full_access`: инструкции плюс явно разрешённые инструменты после permission
+  gates.
+
+Allowlist Skills — это ограничение механизма выбора runtime, а не файловая ACL.
+`full_access` агент сохраняет весь файловый доступ, который предоставляет ему
+операционная система и GigaCode CLI.
+
 ## Full access
 
 Возможность включается явно:

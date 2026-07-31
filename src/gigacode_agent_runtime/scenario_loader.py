@@ -16,6 +16,7 @@ from .domain import ScenarioSource
 from .errors import AgentRuntimeError, ErrorCode
 from .interpolation import validate_template
 from .schema_registry import validate_document
+from .skill_catalog import SkillProfile, SkillProfileCatalog
 from .source_resolver import ContainedSourceResolver, ResolvedResource
 from .yaml_loader import RuntimeSafeLoader, safe_load
 
@@ -30,6 +31,7 @@ class LoadedScenario:
     source: ScenarioSource
     resources: Mapping[str, ResolvedResource]
     agent_profiles: Mapping[str, AgentProfile]
+    skill_profiles: Mapping[str, SkillProfile]
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,9 +141,15 @@ def _snapshot_resources(
     resolver: ContainedSourceResolver,
     base_dir: Path,
     agent_catalog: AgentProfileCatalog | None,
-) -> tuple[Mapping[str, ResolvedResource], Mapping[str, AgentProfile]]:
+    skill_catalog: SkillProfileCatalog | None,
+) -> tuple[
+    Mapping[str, ResolvedResource],
+    Mapping[str, AgentProfile],
+    Mapping[str, SkillProfile],
+]:
     resources: dict[str, ResolvedResource] = {}
     agent_profiles: dict[str, AgentProfile] = {}
+    skill_profiles: dict[str, SkillProfile] = {}
     for raw_agent in cast(Mapping[str, Any], document["agents"]).values():
         agent = cast(Mapping[str, Any], raw_agent)
         reference = agent.get("system_prompt_file")
@@ -161,6 +169,23 @@ def _snapshot_resources(
                 reference=agent_ref,
                 path=profile.source_path,
                 content=profile.raw_content,
+            )
+        for raw_skill_ref in cast(list[object], agent.get("skill_refs", [])):
+            skill_ref = str(raw_skill_ref)
+            if skill_catalog is None:
+                raise AgentRuntimeError(
+                    ErrorCode.SKILL_PROFILE_NOT_FOUND,
+                    "Scenario uses skill_refs but no GigaCode Skill catalog is configured",
+                    details={"skill_ref": skill_ref},
+                )
+            if skill_ref in skill_profiles:
+                continue
+            skill_profile = skill_catalog.load(skill_ref)
+            skill_profiles[skill_ref] = skill_profile
+            resources[f"skill:{skill_ref}"] = ResolvedResource(
+                reference=skill_ref,
+                path=skill_profile.source_path,
+                content=skill_profile.raw_content,
             )
 
     for step in _iter_agent_steps(document):
@@ -186,7 +211,11 @@ def _snapshot_resources(
                     details={"reference": output_schema},
                 )
             resources[output_schema] = resource
-    return MappingProxyType(resources), MappingProxyType(agent_profiles)
+    return (
+        MappingProxyType(resources),
+        MappingProxyType(agent_profiles),
+        MappingProxyType(skill_profiles),
+    )
 
 
 def load_scenario_file(
@@ -195,6 +224,7 @@ def load_scenario_file(
     level: str = "direct",
     workspace_root: Path | None = None,
     agent_catalog: AgentProfileCatalog | None = None,
+    skill_catalog: SkillProfileCatalog | None = None,
 ) -> LoadedScenario:
     resolved_path = path.resolve(strict=True)
     document = _read_scenario_document(resolved_path)
@@ -204,11 +234,12 @@ def load_scenario_file(
     base_dir = resolved_path.parent
     roots = (base_dir,) if workspace_root is None else (base_dir, workspace_root)
     resolver = ContainedSourceResolver(roots)
-    resources, agent_profiles = _snapshot_resources(
+    resources, agent_profiles, skill_profiles = _snapshot_resources(
         document,
         resolver,
         base_dir,
         agent_catalog,
+        skill_catalog,
     )
     metadata = cast(Mapping[str, Any], document["metadata"])
     source = ScenarioSource(level=level, path=resolved_path, root=base_dir)
@@ -218,6 +249,7 @@ def load_scenario_file(
         source=source,
         resources=resources,
         agent_profiles=agent_profiles,
+        skill_profiles=skill_profiles,
     )
 
 
@@ -230,6 +262,7 @@ class ScenarioCatalog:
         project_dir: Path | None = None,
         workspace_root: Path | None = None,
         agent_catalog: AgentProfileCatalog | None = None,
+        skill_catalog: SkillProfileCatalog | None = None,
     ) -> None:
         self._levels = (
             ("builtin", builtin_dir),
@@ -238,6 +271,7 @@ class ScenarioCatalog:
         )
         self._workspace_root = workspace_root
         self._agent_catalog = agent_catalog
+        self._skill_catalog = skill_catalog
 
     def _discover_level(
         self,
@@ -263,6 +297,7 @@ class ScenarioCatalog:
                 level=level,
                 workspace_root=self._workspace_root,
                 agent_catalog=self._agent_catalog,
+                skill_catalog=self._skill_catalog,
             )
             if scenario.name in entries:
                 raise AgentRuntimeError(

@@ -80,6 +80,8 @@ def test_failure_injection_rolls_back_every_stage(
     assert not list((data_dir / "scenarios").glob("corporate-*.yaml"))
     agents_dir = Path(environment["HOME"]) / ".gigacode" / "agents"
     assert not (agents_dir / "business-analyst-proactive.md").exists()
+    skills_dir = Path(environment["HOME"]) / ".gigacode" / "skills"
+    assert not (skills_dir / "runtime-skill-probe" / "SKILL.md").exists()
 
 
 def test_install_keeps_venv_at_created_path_and_is_idempotent(
@@ -116,9 +118,12 @@ def test_install_keeps_venv_at_created_path_and_is_idempotent(
         "corporate-review-repair-loop.yaml",
         "corporate-sequential.yaml",
         "corporate-agent-ref.yaml",
+        "corporate-skill-ref.yaml",
     }
     agents_dir = Path(environment["HOME"]) / ".gigacode" / "agents"
     assert (agents_dir / "business-analyst-proactive.md").is_file()
+    skills_dir = Path(environment["HOME"]) / ".gigacode" / "skills"
+    assert (skills_dir / "runtime-skill-probe" / "SKILL.md").is_file()
 
 
 def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
@@ -130,12 +135,21 @@ def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
     agent = Path(environment["HOME"]) / ".gigacode" / "agents" / (
         "business-analyst-proactive.md"
     )
+    skill = (
+        Path(environment["HOME"])
+        / ".gigacode"
+        / "skills"
+        / "runtime-skill-probe"
+        / "SKILL.md"
+    )
     config.parent.mkdir(parents=True)
     scenario.parent.mkdir(parents=True)
     agent.parent.mkdir(parents=True)
+    skill.parent.mkdir(parents=True)
     config.write_text("existing config\n")
     scenario.write_text("existing scenario\n")
     agent.write_text("existing agent\n")
+    skill.write_text("existing Skill\n")
 
     completed = subprocess.run(
         ["sh", str(release / "installer" / "install-macos.sh")],
@@ -148,6 +162,7 @@ def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
     assert config.read_text() == "existing config\n"
     assert scenario.read_text() == "existing scenario\n"
     assert agent.read_text() == "existing agent\n"
+    assert skill.read_text() == "existing Skill\n"
     assert "preserved existing profile file" in completed.stdout
 
 

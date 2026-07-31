@@ -25,6 +25,7 @@ _NO_TOOL_EXCLUSIONS = (
     "agent",
     "task",
     "skill",
+    "Skill",
     "ask_user_question",
     "ask_user",
     "todo_write",
@@ -57,6 +58,7 @@ class AgentRequest:
     allowed_tools: tuple[str, ...]
     workspace: Path
     output_schema: Mapping[str, object]
+    skill_refs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,15 +169,25 @@ class GigaCodeQwenAdapter:
             required.update({"approval_auto_edit", "sandbox"})
         elif request.permission is PermissionMode.FULL_ACCESS:
             required.update({"approval_auto_edit", "allowed_tools"})
+        if request.skill_refs:
+            required.add("tool_exclusion")
         return required
 
     def _system_prompt(self, request: AgentRequest) -> str:
         sections = [request.system_prompt.rstrip()]
         if self._requires_no_tool_isolation(request):
+            skill_rule = (
+                "You may follow the runtime-selected Skill instructions already "
+                "included above, but do not invoke the native Skill tool or load "
+                "additional Skills. "
+                if request.skill_refs
+                else "Do not call or load Skills. "
+            )
             sections.append(
                 "You are a bounded non-interactive child agent. Do not enter Plan "
                 "Mode or call exit_plan_mode. Do not call or delegate to agents, "
-                "tools, skills, MCP servers, shell commands, or filesystem operations."
+                "tools, MCP servers, shell commands, or filesystem operations. "
+                + skill_rule
             )
         sections.append(
             "## Runtime output contract\n"
@@ -239,6 +251,8 @@ class GigaCodeQwenAdapter:
                     ",".join(_NO_TOOL_EXCLUSIONS),
                 ]
             )
+        elif request.skill_refs:
+            argv.extend(["--exclude-tools", "skill,Skill"])
 
         argv.extend(["--prompt", request.prompt])
         if capabilities.stream_output:

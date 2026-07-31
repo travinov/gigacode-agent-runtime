@@ -210,3 +210,57 @@ async def test_agent_profiles_are_discovered_described_and_planned(
     assert planned["data"]["resource_hashes"]["gigacode:reusable-analyst"].startswith(
         "sha256:"
     )
+
+
+@pytest.mark.anyio
+async def test_skill_profiles_are_discovered_described_and_allowlisted(
+    tmp_path: Path,
+) -> None:
+    skills = tmp_path / "home" / ".gigacode" / "skills"
+    skill_dir = skills / "requirements-review"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\n"
+        "name: requirements-review\n"
+        "description: Review requirements for omissions.\n"
+        "priority: 10\n"
+        "---\n\n"
+        "Return a gap analysis.\n"
+    )
+    project = tmp_path / "project-scenarios"
+    source = (SCENARIOS / "minimal-valid.yaml").read_text().replace(
+        "    permissions: read_only\n",
+        "    permissions: read_only\n"
+        "    skill_refs: [gigacode:requirements-review]\n",
+    )
+    project.mkdir()
+    (project / "skill-ref.yaml").write_text(source)
+    tools = McpToolService(
+        scheduler_config(tmp_path),
+        project_scenarios=project,
+    )
+
+    listed = await tools.list_skill_profiles()
+    described = await tools.describe_skill_profile("requirements-review")
+    scenario = await tools.describe_scenario("minimal-valid")
+    validated = await tools.validate_scenario(scenario_name="minimal-valid")
+    planned = await tools.plan_scenario(
+        scenario_name="minimal-valid",
+        inputs={"task": "formalize"},
+        workspace=str(tmp_path),
+    )
+
+    assert listed["data"]["skills"][0]["skill_ref"] == (
+        "gigacode:requirements-review"
+    )
+    assert described["data"]["instructions"] == "Return a gap analysis."
+    assert scenario["data"]["resolved_skill_refs"][0]["name"] == (
+        "requirements-review"
+    )
+    assert validated["data"]["skill_refs"] == ["gigacode:requirements-review"]
+    assert planned["data"]["agents"]["analyst"]["skills"][0]["reference"] == (
+        "gigacode:requirements-review"
+    )
+    assert planned["data"]["resource_hashes"][
+        "skill:gigacode:requirements-review"
+    ].startswith("sha256:")

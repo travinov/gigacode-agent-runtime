@@ -24,7 +24,9 @@ Runtime объединяет три read-only представления:
 - `permissions`: `read_only`, `propose_only`, `workspace_write` или
   `full_access`;
 - ровно один `system_prompt`, `system_prompt_file` или `agent_ref`;
-- необязательный `allowed_tools`.
+- необязательный `allowed_tools`;
+- необязательный `skill_refs` — до 16 уникальных ссылок
+  `gigacode:<skill-name>`.
 
 `agent_ref: gigacode:<name>` загружает Markdown-профиль из
 `~/.gigacode/agents`. Runtime использует тело файла как system prompt, а
@@ -40,7 +42,23 @@ agents:
     agent_ref: gigacode:business-analyst-proactive
     model: vllm/Qwen3.6-35B-262k
     permissions: propose_only
+    skill_refs:
+      - gigacode:requirements-review
 ```
+
+## Skills
+
+`skill_refs` разрешает агенту только перечисленные Skills из
+`~/.gigacode/skills/<directory>/SKILL.md`. Отсутствующий или пустой список не
+наследует Skills пользователя. Runtime проверяет все ссылки до планирования,
+добавляет выбранные инструкции в system prompt и сохраняет hash каждого
+`SKILL.md` в `resource_hashes` с ключом `skill:gigacode:<name>`.
+
+Нативный tool `skill` для агента с `skill_refs` отключается, поэтому GigaCode не
+может автоматически выбрать незаявленный Skill через свой каталог. В
+`read_only` и `propose_only` агент использует только текст инструкций. Scripts и
+supporting files требуют `workspace_write` или `full_access` и соответствующих
+инструментов. Allowlist Skills не расширяет `permissions`.
 
 Installer размещает готовые сценарии `corporate-*` с корпоративными model ID в
 user catalog. Переносимые встроенные примеры используют
@@ -111,6 +129,7 @@ agent-runtime scenario plan examples/scenarios/sequential.yaml \
 - `~/.gigacode/agent-runtime/scenarios/corporate-mixed.yaml`
 - `~/.gigacode/agent-runtime/scenarios/corporate-review-repair-loop.yaml`
 - `~/.gigacode/agent-runtime/scenarios/corporate-agent-ref.yaml`
+- `~/.gigacode/agent-runtime/scenarios/corporate-skill-ref.yaml`
 
 Переносимые шаблоны:
 

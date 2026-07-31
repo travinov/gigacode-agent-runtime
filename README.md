@@ -11,6 +11,7 @@ Runtime позволяет описать в YAML:
 - условные шаги;
 - ограниченные review/repair loops;
 - разные GigaCode model ID и permission mode для каждого агента;
+- явный allowlist установленных GigaCode Skills для каждого агента;
 - retry, timeout, остановку при отсутствии прогресса и продолжение прерванного
   запуска.
 
@@ -122,7 +123,9 @@ MCP-сервер с именем `gigacode-agent-runtime`. На чистой у�
 - `~/.gigacode/agent-runtime/scenarios/corporate-mixed.yaml`;
 - `~/.gigacode/agent-runtime/scenarios/corporate-review-repair-loop.yaml`;
 - `~/.gigacode/agent-runtime/scenarios/corporate-agent-ref.yaml`;
+- `~/.gigacode/agent-runtime/scenarios/corporate-skill-ref.yaml`;
 - `~/.gigacode/agents/business-analyst-proactive.md`.
+- `~/.gigacode/skills/runtime-skill-probe/SKILL.md`.
 
 Если файл уже существует, installer сохраняет его без изменений. Поэтому
 обновление runtime не перезаписывает пользовательскую конфигурацию или сценарий.
@@ -134,14 +137,16 @@ MCP-сервер с именем `gigacode-agent-runtime`. На чистой у�
 agent-runtime diagnose --subprocess-smoke --json
 agent-runtime scenarios list --json
 agent-runtime agents list --json
+agent-runtime skills list --json
 gigacode mcp list
 ```
 
 В открытом GigaCode вызовите `/mcp`. Сервер `gigacode-agent-runtime` должен
 иметь статус «Подключен», а его инструменты не должны быть помечены как
 недействительные. В `agent-runtime scenarios list --json` должны присутствовать
-пять сценариев `corporate-*`, а `agent-runtime agents list --json` должен найти
-`business-analyst-proactive`.
+шесть сценариев `corporate-*`, `agent-runtime agents list --json` должен найти
+`business-analyst-proactive`, а `agent-runtime skills list --json` —
+`runtime-skill-probe`.
 
 ### Шаг 5. Проверить установленные model ID
 
@@ -168,6 +173,7 @@ gigacode mcp list
 test -f "$HOME/.gigacode/agent-runtime/config.yaml"
 ls "$HOME/.gigacode/agent-runtime/scenarios"/corporate-*.yaml
 test -f "$HOME/.gigacode/agents/business-analyst-proactive.md"
+test -f "$HOME/.gigacode/skills/runtime-skill-probe/SKILL.md"
 ```
 
 Все команды должны завершиться успешно. Эти файлы устанавливаются прямо из
@@ -312,6 +318,12 @@ Runtime объединяет три каталога сценариев:
 через `agent_ref: gigacode:<name>`. Один и тот же профиль можно использовать в
 разных сценариях, последовательных шагах, параллельных ветвях и петлях.
 
+Установленные пользовательские Skills находятся в
+`~/.gigacode/skills/<name>/SKILL.md`. Runtime обнаруживает их через
+`list_skill_profiles` или `agent-runtime skills list --json`. Сценарий не
+наследует весь каталог автоматически: каждый агент получает только явно
+перечисленные `skill_refs`.
+
 Роль агента задаётся:
 
 - именем YAML-ключа, например `creator`;
@@ -319,6 +331,7 @@ Runtime объединяет три каталога сценариев:
 - `permissions`;
 - ровно одним из `system_prompt`, `system_prompt_file` или `agent_ref`;
 - при необходимости списком `allowed_tools`.
+- при необходимости allowlist `skill_refs`.
 
 `metadata.description` описывает весь сценарий, а `system_prompt` описывает роль
 конкретного агента.
@@ -351,6 +364,44 @@ run продолжает использовать снимок даже посл
 Если в профиле есть `tools` и `disallowedTools`, runtime применяет их как
 исходный allowlist только когда сценарий не задал собственный `allowed_tools`.
 Явный список сценария имеет приоритет.
+
+### Явное назначение Skills агенту
+
+```yaml
+agents:
+  business_analyst:
+    agent_ref: gigacode:business-analyst-proactive
+    model: vllm/Qwen3.6-35B-262k
+    permissions: propose_only
+    skill_refs:
+      - gigacode:business-analysis
+      - gigacode:requirements-review
+```
+
+`skill_refs` — список до 16 уникальных ссылок формата `gigacode:<name>`.
+Отсутствующий или пустой список означает, что runtime не предоставляет агенту
+Skills. До запуска runtime проверяет каждый `SKILL.md`, фиксирует его текст и
+SHA-256 в плане и добавляет только выбранные инструкции в system prompt агента.
+Изменение `SKILL.md` меняет `plan_hash` следующего запуска.
+
+При наличии `skill_refs` runtime отключает нативный GigaCode tool `skill` для
+дочернего процесса: это не позволяет механизму автоматического discovery
+подмешать остальные установленные Skills. Выбранные ссылки и hashes видны в
+ExecutionPlan, событиях и Web UI.
+
+Для `read_only` и `propose_only` доступны только инструкции из `SKILL.md`:
+скрипты, файловые операции и MCP по-прежнему запрещены. `workspace_write` или
+`full_access` могут выполнять разрешённые инструменты и обращаться к файлам
+выбранного Skill относительно показанного `base_dir`. `skill_refs` ограничивает
+канал выбора Skills runtime, но не является файловой ACL: агент с
+`full_access` технически может читать другие доступные ему файлы.
+
+Installer кладёт безопасную проверку в готовые пути:
+
+```text
+~/.gigacode/skills/runtime-skill-probe/SKILL.md
+~/.gigacode/agent-runtime/scenarios/corporate-skill-ref.yaml
+```
 
 ## Готовый последовательный сценарий
 
@@ -581,6 +632,7 @@ inputs:
 | `system_prompt_file` | Один из трёх | Относительный путь | Роль из отдельного UTF-8 файла рядом со сценарием. |
 | `agent_ref` | Один из трёх | `gigacode:<name>` | Переиспользуемый агент из `~/.gigacode/agents`. |
 | `allowed_tools` | Нет | Список уникальных строк | Точные tool ID, передаваемые через `--allowed-tools` для `full_access`, если GigaCode поддерживает capability. |
+| `skill_refs` | Нет | До 16 уникальных `gigacode:<name>` | Skills из `~/.gigacode/skills`, явно доступные только этому агенту. Пустой или отсутствующий список ничего не наследует. |
 
 Режимы `permissions`:
 
@@ -623,6 +675,12 @@ Runtime разрешает читать prompt/schema resources только и�
 Для `agent_ref` произвольные пути запрещены: runtime ищет имя только в
 `~/.gigacode/agents`, отклоняет symlink-файлы и дубликаты имён и включает
 снимок профиля в `scenario_hash`, `resource_hashes` и `plan_hash`.
+
+Для `skill_refs` произвольные пути также запрещены: runtime ищет
+`~/.gigacode/skills/<каталог>/SKILL.md`, проверяет front matter, UTF-8,
+дубликаты и symlink-пути. Корневой `SKILL.md` сохраняется в snapshot; его
+соседние scripts/references остаются файлами установленного Skill и требуют
+соответствующих permissions.
 
 ### `result`
 
@@ -1129,15 +1187,17 @@ candidate из предыдущей итерации.
 
 1. при необходимости `list_agent_profiles` или `describe_agent_profile`, чтобы
    найти переиспользуемые роли из `~/.gigacode/agents`;
-2. `list_scenarios` или `describe_scenario`; `describe_scenario` возвращает
+2. при необходимости `list_skill_profiles` или `describe_skill_profile`, чтобы
+   выбрать точные `skill_refs` из `~/.gigacode/skills`;
+3. `list_scenarios` или `describe_scenario`; `describe_scenario` возвращает
    полный YAML-контракт агентов, шагов, зависимостей и output schemas;
-3. `validate_scenario`;
-4. `plan_scenario` с `inputs_yaml`;
-5. проверка waves, моделей, permissions, workspace и `plan_hash`;
-6. `start_run`;
-7. `get_run_status` и `get_run_events`;
-8. `get_run_result`;
-9. при необходимости `get_run_artifacts` или `open_dashboard`.
+4. `validate_scenario`;
+5. `plan_scenario` с `inputs_yaml`;
+6. проверка waves, моделей, permissions, Skills, workspace и `plan_hash`;
+7. `start_run`;
+8. `get_run_status` и `get_run_events`;
+9. `get_run_result`;
+10. при необходимости `get_run_artifacts` или `open_dashboard`.
 
 Пример запроса в чат GigaCode:
 
@@ -1322,14 +1382,15 @@ runs/RUN_ID/artifacts/steps/STEP/attempt-N/stderr.txt
 
 ## Готовые примеры и дополнительная документация
 
-Для корпоративной проверки installer автоматически размещает пять готовых
+Для корпоративной проверки installer автоматически размещает шесть готовых
 сценариев с проверенными model ID:
 
 - `corporate-sequential`;
 - `corporate-parallel`;
 - `corporate-mixed`;
 - `corporate-review-repair-loop`;
-- `corporate-agent-ref`.
+- `corporate-agent-ref`;
+- `corporate-skill-ref`.
 
 Их исходники находятся в `corporate-profile/scenarios/`.
 

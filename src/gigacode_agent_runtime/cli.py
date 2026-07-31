@@ -13,7 +13,11 @@ from pathlib import Path
 import anyio
 
 from .adapter_factory import create_gigacode_adapter
-from .catalog import create_agent_profile_catalog, create_scenario_catalog
+from .catalog import (
+    create_agent_profile_catalog,
+    create_scenario_catalog,
+    create_skill_profile_catalog,
+)
 from .cli_format import (
     EXIT_INTERNAL,
     emit,
@@ -87,6 +91,14 @@ def build_parser() -> argparse.ArgumentParser:
     agent_describe = agents_sub.add_parser("describe")
     agent_describe.add_argument("name")
     _add_json(agent_describe)
+
+    skills = subparsers.add_parser("skills")
+    skills_sub = skills.add_subparsers(dest="skills_command", required=True)
+    skills_list = skills_sub.add_parser("list")
+    _add_json(skills_list)
+    skill_describe = skills_sub.add_parser("describe")
+    skill_describe.add_argument("name")
+    _add_json(skill_describe)
 
     scenario = subparsers.add_parser("scenario")
     scenario_sub = scenario.add_subparsers(dest="scenario_command", required=True)
@@ -176,6 +188,7 @@ def _target_scenario(target: str, config: EffectiveConfig) -> LoadedScenario:
         return load_scenario_file(
             path,
             agent_catalog=create_agent_profile_catalog(config),
+            skill_catalog=create_skill_profile_catalog(config),
         )
     return _catalog(config).load(target)
 
@@ -341,9 +354,9 @@ def _execute(arguments: argparse.Namespace, config: EffectiveConfig) -> int:
         emit({"scenarios": entries}, as_json=as_json)
         return 0
     if arguments.command == "agents":
-        catalog = create_agent_profile_catalog(config)
+        agent_catalog = create_agent_profile_catalog(config)
         if arguments.agents_command == "list":
-            profiles = [
+            agent_documents = [
                 {
                     "name": profile.name,
                     "agent_ref": profile.reference,
@@ -353,28 +366,66 @@ def _execute(arguments: argparse.Namespace, config: EffectiveConfig) -> int:
                     "source_path": str(profile.source_path),
                 }
                 for profile in sorted(
-                    catalog.discover().values(),
+                    agent_catalog.discover().values(),
                     key=lambda item: item.name,
                 )
             ]
             emit(
-                {"catalog_root": str(catalog.root), "agents": profiles},
+                {"catalog_root": str(agent_catalog.root), "agents": agent_documents},
                 as_json=as_json,
             )
         else:
-            profile = catalog.load(arguments.name)
+            agent_profile = agent_catalog.load(arguments.name)
             emit(
                 {
+                    "name": agent_profile.name,
+                    "agent_ref": agent_profile.reference,
+                    "description": agent_profile.description,
+                    "model": agent_profile.model,
+                    "approval_mode": agent_profile.approval_mode,
+                    "tools": list(agent_profile.tools),
+                    "disallowed_tools": list(agent_profile.disallowed_tools),
+                    "color": agent_profile.color,
+                    "source_path": str(agent_profile.source_path),
+                    "system_prompt": agent_profile.system_prompt,
+                },
+                as_json=as_json,
+            )
+        return 0
+    if arguments.command == "skills":
+        skill_catalog = create_skill_profile_catalog(config)
+        if arguments.skills_command == "list":
+            skill_documents = [
+                {
                     "name": profile.name,
-                    "agent_ref": profile.reference,
+                    "skill_ref": profile.reference,
                     "description": profile.description,
-                    "model": profile.model,
-                    "approval_mode": profile.approval_mode,
-                    "tools": list(profile.tools),
-                    "disallowed_tools": list(profile.disallowed_tools),
-                    "color": profile.color,
                     "source_path": str(profile.source_path),
-                    "system_prompt": profile.system_prompt,
+                    "priority": profile.priority,
+                }
+                for profile in sorted(
+                    skill_catalog.discover().values(),
+                    key=lambda item: item.name,
+                )
+            ]
+            emit(
+                {"catalog_root": str(skill_catalog.root), "skills": skill_documents},
+                as_json=as_json,
+            )
+        else:
+            skill_profile = skill_catalog.load(arguments.name)
+            emit(
+                {
+                    "name": skill_profile.name,
+                    "skill_ref": skill_profile.reference,
+                    "description": skill_profile.description,
+                    "priority": skill_profile.priority,
+                    "user_invocable": skill_profile.user_invocable,
+                    "disable_model_invocation": skill_profile.disable_model_invocation,
+                    "paths": list(skill_profile.paths),
+                    "source_path": str(skill_profile.source_path),
+                    "base_dir": str(skill_profile.base_dir),
+                    "instructions": skill_profile.instructions,
                 },
                 as_json=as_json,
             )
@@ -383,6 +434,7 @@ def _execute(arguments: argparse.Namespace, config: EffectiveConfig) -> int:
         scenario = load_scenario_file(
             arguments.file,
             agent_catalog=create_agent_profile_catalog(config),
+            skill_catalog=create_skill_profile_catalog(config),
         )
         if arguments.scenario_command == "validate":
             document = {"valid": True, "name": scenario.name}

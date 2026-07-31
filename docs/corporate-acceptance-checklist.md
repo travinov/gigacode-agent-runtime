@@ -43,10 +43,11 @@ gigacode mcp list
 
 Откройте новый чат GigaCode и попросите вызвать `list_scenarios`, затем
 `list_agent_profiles`, `describe_agent_profile` для
-`business-analyst-proactive`, `describe_scenario` для `corporate-sequential`,
-затем `diagnose_runtime`.
+`business-analyst-proactive`, `list_skill_profiles`, `describe_skill_profile`
+для `runtime-skill-probe`, `describe_scenario` для `corporate-sequential`, затем
+`diagnose_runtime`.
 Убедитесь, что
-доступны все 18 tools из `docs/mcp-api.md`, каждый tool имеет непустое описание,
+доступны все 20 tools из `docs/mcp-api.md`, каждый tool имеет непустое описание,
 `/mcp` не показывает недействительные инструменты, `describe_scenario`
 возвращает полные поля `kind`, `needs`, `prompt` и `output_schema`, а ответы
 имеют envelope `ok/data` или `ok/error`.
@@ -59,7 +60,9 @@ Installer должен уже положить конфигурацию и го�
 test -f "$HOME/.gigacode/agent-runtime/config.yaml"
 ls "$HOME/.gigacode/agent-runtime/scenarios"/corporate-*.yaml
 test -f "$HOME/.gigacode/agents/business-analyst-proactive.md"
+test -f "$HOME/.gigacode/skills/runtime-skill-probe/SKILL.md"
 agent-runtime agents list --json
+agent-runtime skills list --json
 ```
 
 Проверьте готовые файлы без копирования или редактирования:
@@ -71,6 +74,8 @@ agent-runtime scenario validate \
   "$HOME/.gigacode/agent-runtime/scenarios/corporate-parallel.yaml" --json
 agent-runtime scenario validate \
   "$HOME/.gigacode/agent-runtime/scenarios/corporate-agent-ref.yaml" --json
+agent-runtime scenario validate \
+  "$HOME/.gigacode/agent-runtime/scenarios/corporate-skill-ref.yaml" --json
 ```
 
 В `/model` должны присутствовать:
@@ -115,6 +120,20 @@ GigaCode должен выбрать `corporate-agent-ref` или явно со�
 `gigacode:business-analyst-proactive`, а план должен содержать `source_ref` и
 соответствующий SHA-256 в `resource_hashes`. Пользователь не указывает
 `idempotency_key` вручную.
+
+Затем проверьте явное назначение Skill обычным запросом:
+
+```text
+Используй Agent Runtime и сценарий corporate-skill-ref. Передай task:
+"Кратко опиши назначение локального MCP runtime". Сначала проверь и покажи
+план, включая skill_refs и hash Skill, затем запусти сценарий, дождись
+завершения и покажи результат.
+```
+
+План должен содержать только `gigacode:runtime-skill-probe`, capability
+`tool_exclusion` и ресурс `skill:gigacode:runtime-skill-probe`. Итог обязан
+содержать `"skill_marker": "RUNTIME_SKILL_PROBE_OK"`. В Web UI строка шага
+должна показывать назначенный Skill.
 
 Не используйте MCP-параметр `inputs`: wire-контракт GigaCode/Qwen принимает
 значения сценария через строковый `inputs_yaml`. Не кодируйте JSON object

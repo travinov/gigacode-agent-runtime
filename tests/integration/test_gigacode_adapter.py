@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -102,6 +103,28 @@ async def test_workspace_write_uses_sandbox_and_workspace_cwd(tmp_path: Path) ->
 
 
 @pytest.mark.anyio
+async def test_explicit_skills_disable_native_skill_tool_for_workspace_agent(
+    tmp_path: Path,
+) -> None:
+    adapter = _adapter(tmp_path, "success")
+    request = replace(
+        _request(tmp_path, permission=PermissionMode.WORKSPACE_WRITE),
+        skill_refs=("gigacode:requirements-review",),
+    )
+
+    await adapter.run_agent(request, timeout_seconds=2)
+
+    traces = [
+        json.loads(line) for line in (tmp_path / "trace.jsonl").read_text().splitlines()
+    ]
+    argv = traces[-1]["argv"]
+    exclusion_index = argv.index("--exclude-tools")
+    assert argv[exclusion_index + 1] == "skill,Skill"
+    assert "--extensions" not in argv
+    assert "--core-tools" not in argv
+
+
+@pytest.mark.anyio
 async def test_adapter_uses_prompt_stream_output_schema_and_no_tool_isolation(
     tmp_path: Path,
 ) -> None:
@@ -160,6 +183,24 @@ async def test_safe_agent_contract_explicitly_forbids_native_plan_mode(
     assert "Do not enter Plan Mode or call exit_plan_mode" in system_prompt
     assert input_text == ""
     assert output_format == "stream-json"
+
+
+@pytest.mark.anyio
+async def test_safe_agent_may_follow_injected_skill_without_native_skill_tool(
+    tmp_path: Path,
+) -> None:
+    adapter = _adapter(tmp_path, "success")
+    capabilities = await adapter.detect_capabilities()
+    request = replace(
+        _request(tmp_path, permission=PermissionMode.PROPOSE_ONLY),
+        skill_refs=("gigacode:runtime-skill-probe",),
+    )
+
+    command, _input_text, _output_format = adapter._command(request, capabilities)
+    system_prompt = str(command[command.index("--system-prompt") + 1])
+
+    assert "follow the runtime-selected Skill instructions" in system_prompt
+    assert "do not invoke the native Skill tool" in system_prompt
 
 
 @pytest.mark.anyio

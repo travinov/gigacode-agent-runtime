@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.0-rc.12] - 2026-07-31
+
+### Added
+
+- Add per-agent `skill_refs` allowlists for installed Skills from
+  `~/.gigacode/skills/<name>/SKILL.md`.
+- Validate and snapshot selected Skill instructions and SHA-256 values into the
+  immutable execution plan, events, and Web UI.
+- Add `list_skill_profiles` and `describe_skill_profile` MCP tools plus
+  `agent-runtime skills list|describe` CLI commands.
+- Install a safe `runtime-skill-probe` and ready `corporate-skill-ref` scenario
+  for acceptance without copying or editing files.
+
+### Security
+
+- Disable the native GigaCode `skill` tool whenever explicit `skill_refs` are
+  present, preventing automatic discovery of unlisted Skills through that tool.
+- Keep `read_only` and `propose_only` agents tool-free even when Skill
+  instructions are assigned.
+
 ## [1.0.0-rc.11] - 2026-07-31
 
 ### Added

@@ -16,3 +16,4 @@ def test_static_assets_are_packaged_and_have_no_external_dependencies() -> None:
     assert "history.replaceState" in javascript
     assert "window.location.hash" in javascript
     assert "EventSource" in javascript
+    assert "Skills:" in javascript

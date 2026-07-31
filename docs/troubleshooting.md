@@ -56,6 +56,21 @@ ls "$HOME/.gigacode/agents"/*.md
 `validate_scenario`; уже созданные runs продолжают использовать сохранённый
 снимок.
 
+## Skill profile not found или invalid
+
+Проверьте каталог и front matter:
+
+```bash
+agent-runtime skills list --json
+ls "$HOME/.gigacode/skills"/*/SKILL.md
+```
+
+`skill_refs` использует формат `gigacode:<name>`, где `<name>` совпадает с
+полем `name` в `SKILL.md`. Runtime отклоняет отсутствующие Skills, дубликаты,
+пустые инструкции, некорректный UTF-8 и symlink-каталоги/файлы. После
+исправления снова выполните `validate_scenario` и `plan_scenario`; изменение
+Skill создаёт новый `plan_hash`.
+
 ## `params/inputs must be object`
 
 RC7 не выставляет неоднозначный MCP-параметр `inputs`. Передавайте значения

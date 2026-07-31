@@ -19,8 +19,13 @@ subagent calls.
   `describe_agent_profile`. Reuse them with
   `agent_ref: gigacode:<name>` instead of copying their system prompts into a
   scenario. Keep model IDs and permissions explicit in the scenario.
+- Discover installed GigaCode Skills with `list_skill_profiles` and
+  `describe_skill_profile`. Grant only the required Skills to each agent with
+  `skill_refs: [gigacode:<name>]`; never assume the full user catalog is
+  inherited.
 - Prefer the installed `corporate-sequential`, `corporate-parallel`,
-  `corporate-mixed`, `corporate-review-repair-loop`, or `corporate-agent-ref`
+  `corporate-mixed`, `corporate-review-repair-loop`, `corporate-agent-ref`, or
+  `corporate-skill-ref`
   scenario for corporate acceptance. They already contain approved model IDs.
 - Accept a named catalog scenario or `inline_scenario_yaml`. Provide exactly
   one. Pass an inline scenario as YAML text beginning with `schema_version`,
@@ -37,7 +42,7 @@ subagent calls.
    `inputs` parameter and never JSON-encode the mapping.
 3. Call `plan_scenario` with the exact workspace and `inputs_yaml`.
 4. Inspect and summarize waves, model IDs, permissions, workspace, capability
-   requirements, and `plan_hash`.
+   requirements, assigned Skills and hashes, and `plan_hash`.
 5. Call `start_run` with the identical `inputs_yaml` only when the user asked
    to execute. Generate a unique safe `idempotency_key` internally for the new
    action and reuse it only when retrying that exact request. Never ask the user
@@ -103,6 +108,7 @@ agents:
     model: EXACT_GIGACODE_MODEL_ID
     permissions: propose_only
     system_prompt: Create a structured proposal.
+    skill_refs: []
   reviewer:
     model: EXACT_GIGACODE_REVIEW_MODEL_ID
     permissions: read_only

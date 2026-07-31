@@ -82,3 +82,37 @@ def test_agents_list_and_describe_use_native_user_catalog(tmp_path: Path) -> Non
     assert json.loads(listed.stdout)["agents"][0]["name"] == "reusable-analyst"
     assert described.returncode == 0, described.stderr
     assert json.loads(described.stdout)["system_prompt"] == "Analyze requirements."
+
+
+def test_skills_list_and_describe_use_native_user_catalog(tmp_path: Path) -> None:
+    skill_dir = (
+        tmp_path
+        / "home"
+        / ".gigacode"
+        / "skills"
+        / "requirements-review"
+    )
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\n"
+        "name: requirements-review\n"
+        "description: Review requirements.\n"
+        "---\n\n"
+        "Return a gap analysis.\n"
+    )
+
+    listed = run_cli(tmp_path, "skills", "list", "--json")
+    described = run_cli(
+        tmp_path,
+        "skills",
+        "describe",
+        "gigacode:requirements-review",
+        "--json",
+    )
+
+    assert listed.returncode == 0, listed.stderr
+    assert json.loads(listed.stdout)["skills"][0]["skill_ref"] == (
+        "gigacode:requirements-review"
+    )
+    assert described.returncode == 0, described.stderr
+    assert json.loads(described.stdout)["instructions"] == "Return a gap analysis."

@@ -20,6 +20,7 @@ rollback_failed_install() {
         case "$SEEDED_PATH" in
           "$GAR_DATA_DIR"/*) gar_assert_safe_under "$SEEDED_PATH" "$GAR_DATA_DIR" ;;
           "$GAR_AGENTS_DIR"/*) gar_assert_safe_under "$SEEDED_PATH" "$GAR_AGENTS_DIR" ;;
+          "$GAR_SKILLS_DIR"/*) gar_assert_safe_under "$SEEDED_PATH" "$GAR_SKILLS_DIR" ;;
           *) gar_die "seeded path is outside managed roots: $SEEDED_PATH" ;;
         esac
         /bin/rm -f "$SEEDED_PATH"
@@ -90,6 +91,18 @@ seed_corporate_profile() {
       "$GAR_AGENTS_DIR/$(basename "$SOURCE_AGENT")"
   done
   [ "$AGENT_COUNT" -gt 0 ] || gar_die "corporate agent profile is empty"
+  SKILL_COUNT=0
+  for SOURCE_SKILL_DIR in "$PROFILE_ROOT/skills/"*; do
+    [ -d "$SOURCE_SKILL_DIR" ] || continue
+    SOURCE_SKILL="$SOURCE_SKILL_DIR/SKILL.md"
+    [ -f "$SOURCE_SKILL" ] || gar_die "corporate Skill is missing SKILL.md"
+    SKILL_COUNT=$((SKILL_COUNT + 1))
+    TARGET_SKILL_DIR="$GAR_SKILLS_DIR/$(basename "$SOURCE_SKILL_DIR")"
+    [ ! -L "$TARGET_SKILL_DIR" ] || gar_die "refusing symlinked Skill directory"
+    mkdir -p "$TARGET_SKILL_DIR"
+    seed_file_if_missing "$SOURCE_SKILL" "$TARGET_SKILL_DIR/SKILL.md"
+  done
+  [ "$SKILL_COUNT" -gt 0 ] || gar_die "corporate Skill profile is empty"
 }
 
 on_exit() {
@@ -125,7 +138,8 @@ PROJECT_DIGEST=$(
 )
 
 mkdir -p "$GAR_INSTALL_ROOT/versions" "$GAR_BIN_DIR" \
-  "$GAR_DATA_DIR/scenarios" "$GAR_DATA_DIR/runs" "$GAR_AGENTS_DIR"
+  "$GAR_DATA_DIR/scenarios" "$GAR_DATA_DIR/runs" "$GAR_AGENTS_DIR" \
+  "$GAR_SKILLS_DIR"
 VERSION_TARGET="versions/$GAR_VERSION-$PROJECT_DIGEST"
 VERSION_DIR="$GAR_INSTALL_ROOT/$VERSION_TARGET"
 PREVIOUS_TARGET=$(gar_read_current)

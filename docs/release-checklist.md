@@ -1,8 +1,8 @@
 # Release checklist v1
 
-Статус `v1.0.0`: локальный release candidate. Публикация и Git-тег разрешены
-только после прохождения корпоративного acceptance на реальном Mac `x86_64` с
-реальным GigaCode CLI.
+Статус `v1.0.0`: release candidate. RC-тег и ZIP разрешено публиковать для
+корпоративного acceptance. Финальный стабильный тег разрешён только после
+прохождения checklist на реальном Mac `x86_64` с реальным GigaCode CLI.
 
 ## Автоматический локальный gate
 
@@ -34,6 +34,7 @@ GIGACODE_AGENT_RUNTIME_RELEASE_ZIP="$PWD/dist/gigacode-agent-runtime-v1.0.0-maco
 | retry и loop имеют отдельные counters | `test_retry.py`, loop integration tests |
 | resume не повторяет completed | `test_resume.py` |
 | full access имеет global и exact-plan gates | `test_permissions.py` |
+| `skill_refs` разрешает только выбранные Skills и меняет plan hash | `test_skill_catalog.py`, `test_plan_compiler.py`, adapter/MCP tests |
 | MCP stdout — только protocol, Qwen wire использует YAML strings | real `ClientSession` в `test_end_to_end_fake.py`, MCP schema tests |
 | Web auth, SSE, status и control | `tests/web/` и headed browser smoke |
 | installer не использует package index и атомарно размещает corporate profile | installer contract и ZIP resolution test |
