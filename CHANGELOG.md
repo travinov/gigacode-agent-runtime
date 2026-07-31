@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0-rc.13] - 2026-07-31
+
+### Added
+
+- Discover active Skills from `~/.gigacode/skills`, `~/.gigacode/extensions`,
+  and `~/.gigacode/bin/bundled` without scanning historical
+  `~/.gigacode/extension-sources` copies.
+- Report the selected `source_level`, exact source path, catalog roots, and
+  shadowed candidates through MCP, CLI, scenario descriptions, and execution
+  plans.
+
+### Fixed
+
+- Resolve duplicate Skill names deterministically instead of blocking the whole
+  catalog: user overrides extension, extension overrides bundled, and a
+  canonical directory name wins ties within one source level.
+
 ## [1.0.0-rc.12] - 2026-07-31
 
 ### Added

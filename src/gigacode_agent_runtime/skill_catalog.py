@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import stat
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import isfinite
 from pathlib import Path
 from types import MappingProxyType
@@ -31,14 +31,21 @@ class SkillProfile:
     source_path: Path
     base_dir: Path
     raw_content: str
+    source_level: str = "user"
+    source_root: Path | None = None
     priority: float | None = None
     user_invocable: bool | None = None
     disable_model_invocation: bool = False
     paths: tuple[str, ...] = ()
+    shadowed_profiles: tuple[SkillProfile, ...] = ()
 
     @property
     def reference(self) -> str:
         return f"{_SKILL_REFERENCE_PREFIX}{self.name}"
+
+    @property
+    def canonical_directory(self) -> bool:
+        return self.base_dir.name == self.name
 
 
 def skill_name_from_reference(reference: str) -> str:
@@ -136,7 +143,12 @@ def _path_list(metadata: Mapping[str, Any], path: Path) -> tuple[str, ...]:
     return normalized
 
 
-def load_skill_profile(path: Path, *, expected_root: Path | None = None) -> SkillProfile:
+def load_skill_profile(
+    path: Path,
+    *,
+    expected_root: Path | None = None,
+    source_level: str = "user",
+) -> SkillProfile:
     """Load one Skill without allowing symlink or catalog-root escapes."""
 
     try:
@@ -206,6 +218,8 @@ def load_skill_profile(path: Path, *, expected_root: Path | None = None) -> Skil
         source_path=resolved,
         base_dir=resolved.parent,
         raw_content=content,
+        source_level=source_level,
+        source_root=root,
         priority=float(priority_raw) if priority_raw is not None else None,
         user_invocable=_optional_bool(metadata, resolved, "user-invocable"),
         disable_model_invocation=bool(disabled),
@@ -214,36 +228,99 @@ def load_skill_profile(path: Path, *, expected_root: Path | None = None) -> Skil
 
 
 class SkillProfileCatalog:
-    """Name-indexed catalog rooted at ``~/.gigacode/skills``."""
+    """Deterministic catalog of active user, extension, and bundled Skills."""
 
-    def __init__(self, root: Path) -> None:
-        self.root = root.resolve(strict=False)
+    def __init__(
+        self,
+        root: Path,
+        *,
+        extension_root: Path | None = None,
+        bundled_root: Path | None = None,
+    ) -> None:
+        self.root = root.expanduser().absolute()
+        self.extension_root = (
+            extension_root.expanduser().absolute()
+            if extension_root is not None
+            else None
+        )
+        self.bundled_root = (
+            bundled_root.expanduser().absolute()
+            if bundled_root is not None
+            else None
+        )
 
-    def discover(self) -> Mapping[str, SkillProfile]:
-        if not self.root.exists():
-            return MappingProxyType({})
-        if not self.root.is_dir() or self.root.is_symlink():
+    @property
+    def roots(self) -> Mapping[str, Path]:
+        roots: dict[str, Path] = {"user": self.root}
+        if self.extension_root is not None:
+            roots["extension"] = self.extension_root
+        if self.bundled_root is not None:
+            roots["bundled"] = self.bundled_root
+        return MappingProxyType(roots)
+
+    def _sources(self) -> tuple[tuple[int, str, Path, tuple[str, ...]], ...]:
+        sources: list[tuple[int, str, Path, tuple[str, ...]]] = [
+            (0, "user", self.root, ("*/SKILL.md",)),
+        ]
+        if self.extension_root is not None:
+            sources.append(
+                (
+                    1,
+                    "extension",
+                    self.extension_root,
+                    ("*/SKILL.md", "*/skills/*/SKILL.md"),
+                )
+            )
+        if self.bundled_root is not None:
+            sources.append(
+                (
+                    2,
+                    "bundled",
+                    self.bundled_root,
+                    ("*/SKILL.md", "*/skills/*/SKILL.md"),
+                )
+            )
+        return tuple(sources)
+
+    @staticmethod
+    def _source_paths(root: Path, patterns: tuple[str, ...]) -> tuple[Path, ...]:
+        if not root.exists():
+            return ()
+        if not root.is_dir() or root.is_symlink():
             raise AgentRuntimeError(
                 ErrorCode.PATH_NOT_ALLOWED,
-                "GigaCode Skill catalog must be a non-symlink directory",
-                details={"path": str(self.root)},
+                "GigaCode Skill catalog source must be a non-symlink directory",
+                details={"path": str(root)},
             )
-        profiles: dict[str, SkillProfile] = {}
-        for path in sorted(self.root.glob("*/SKILL.md")):
-            profile = load_skill_profile(path, expected_root=self.root)
-            if profile.name in profiles:
-                raise AgentRuntimeError(
-                    ErrorCode.SKILL_PROFILE_INVALID,
-                    f"Duplicate GigaCode Skill name: {profile.name}",
-                    details={
-                        "name": profile.name,
-                        "paths": [
-                            str(profiles[profile.name].source_path),
-                            str(profile.source_path),
-                        ],
-                    },
+        paths = {path for pattern in patterns for path in root.glob(pattern)}
+        return tuple(sorted(paths))
+
+    def discover(self) -> Mapping[str, SkillProfile]:
+        candidates: dict[str, list[tuple[int, SkillProfile]]] = {}
+        for rank, level, root, patterns in self._sources():
+            for path in self._source_paths(root, patterns):
+                profile = load_skill_profile(
+                    path,
+                    expected_root=root,
+                    source_level=level,
                 )
-            profiles[profile.name] = profile
+                candidates.setdefault(profile.name, []).append((rank, profile))
+
+        profiles: dict[str, SkillProfile] = {}
+        for name in sorted(candidates):
+            ordered = sorted(
+                candidates[name],
+                key=lambda item: (
+                    item[0],
+                    0 if item[1].canonical_directory else 1,
+                    str(item[1].source_path),
+                ),
+            )
+            selected = ordered[0][1]
+            profiles[name] = replace(
+                selected,
+                shadowed_profiles=tuple(item[1] for item in ordered[1:]),
+            )
         return MappingProxyType(profiles)
 
     def load(self, name_or_reference: str) -> SkillProfile:

@@ -62,14 +62,16 @@ ls "$HOME/.gigacode/agents"/*.md
 
 ```bash
 agent-runtime skills list --json
-ls "$HOME/.gigacode/skills"/*/SKILL.md
 ```
 
 `skill_refs` использует формат `gigacode:<name>`, где `<name>` совпадает с
-полем `name` в `SKILL.md`. Runtime отклоняет отсутствующие Skills, дубликаты,
-пустые инструкции, некорректный UTF-8 и symlink-каталоги/файлы. После
-исправления снова выполните `validate_scenario` и `plan_scenario`; изменение
-Skill создаёт новый `plan_hash`.
+полем `name` в `SKILL.md`. Runtime объединяет `~/.gigacode/skills`, активные
+`~/.gigacode/extensions` и `~/.gigacode/bin/bundled`, но не читает
+`extension-sources`. Дубликаты не блокируют каталог: проверьте выбранный
+`source_path` и `shadowed_sources`. Пустые инструкции, некорректный UTF-8 и
+symlink-каталоги/файлы отклоняются. После исправления снова выполните
+`validate_scenario` и `plan_scenario`; изменение Skill создаёт новый
+`plan_hash`.
 
 ## `params/inputs must be object`
 

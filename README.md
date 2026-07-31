@@ -318,11 +318,18 @@ Runtime объединяет три каталога сценариев:
 через `agent_ref: gigacode:<name>`. Один и тот же профиль можно использовать в
 разных сценариях, последовательных шагах, параллельных ветвях и петлях.
 
-Установленные пользовательские Skills находятся в
-`~/.gigacode/skills/<name>/SKILL.md`. Runtime обнаруживает их через
-`list_skill_profiles` или `agent-runtime skills list --json`. Сценарий не
-наследует весь каталог автоматически: каждый агент получает только явно
-перечисленные `skill_refs`.
+Runtime объединяет активные Skills из трёх источников: пользовательские
+`~/.gigacode/skills/<name>/SKILL.md`, установленные расширения
+`~/.gigacode/extensions/` и встроенные Skills `~/.gigacode/bin/bundled/`.
+Исторический cache `~/.gigacode/extension-sources/` намеренно не сканируется.
+Каталог доступен через `list_skill_profiles` или
+`agent-runtime skills list --json`. Сценарий не наследует его автоматически:
+каждый агент получает только явно перечисленные `skill_refs`.
+
+При одинаковом `name` действует приоритет `user > extension > bundled`.
+Внутри одного уровня выигрывает каталог, имя которого совпадает с `name`, затем
+лексикографически первый путь. Остальные безопасно игнорируются и возвращаются
+в `shadowed_sources`, поэтому дубликат не блокирует весь MCP-каталог.
 
 Роль агента задаётся:
 
@@ -632,7 +639,7 @@ inputs:
 | `system_prompt_file` | Один из трёх | Относительный путь | Роль из отдельного UTF-8 файла рядом со сценарием. |
 | `agent_ref` | Один из трёх | `gigacode:<name>` | Переиспользуемый агент из `~/.gigacode/agents`. |
 | `allowed_tools` | Нет | Список уникальных строк | Точные tool ID, передаваемые через `--allowed-tools` для `full_access`, если GigaCode поддерживает capability. |
-| `skill_refs` | Нет | До 16 уникальных `gigacode:<name>` | Skills из `~/.gigacode/skills`, явно доступные только этому агенту. Пустой или отсутствующий список ничего не наследует. |
+| `skill_refs` | Нет | До 16 уникальных `gigacode:<name>` | Активные user/extension/bundled Skills, явно доступные только этому агенту. Пустой или отсутствующий список ничего не наследует. |
 
 Режимы `permissions`:
 
@@ -676,10 +683,11 @@ Runtime разрешает читать prompt/schema resources только и�
 `~/.gigacode/agents`, отклоняет symlink-файлы и дубликаты имён и включает
 снимок профиля в `scenario_hash`, `resource_hashes` и `plan_hash`.
 
-Для `skill_refs` произвольные пути также запрещены: runtime ищет
-`~/.gigacode/skills/<каталог>/SKILL.md`, проверяет front matter, UTF-8,
-дубликаты и symlink-пути. Корневой `SKILL.md` сохраняется в snapshot; его
-соседние scripts/references остаются файлами установленного Skill и требуют
+Для `skill_refs` произвольные пути также запрещены: runtime ищет только в
+активных user/extension/bundled корнях, проверяет front matter, UTF-8 и
+symlink-пути, затем применяет документированный приоритет источников. Корневой
+`SKILL.md` выбранного профиля сохраняется в snapshot; его соседние
+scripts/references остаются файлами установленного Skill и требуют
 соответствующих permissions.
 
 ### `result`
@@ -1188,7 +1196,7 @@ candidate из предыдущей итерации.
 1. при необходимости `list_agent_profiles` или `describe_agent_profile`, чтобы
    найти переиспользуемые роли из `~/.gigacode/agents`;
 2. при необходимости `list_skill_profiles` или `describe_skill_profile`, чтобы
-   выбрать точные `skill_refs` из `~/.gigacode/skills`;
+   выбрать точные `skill_refs` из объединённого user/extension/bundled каталога;
 3. `list_scenarios` или `describe_scenario`; `describe_scenario` возвращает
    полный YAML-контракт агентов, шагов, зависимостей и output schemas;
 4. `validate_scenario`;

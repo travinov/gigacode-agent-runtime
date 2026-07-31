@@ -176,6 +176,8 @@ def _compile_agents(
                     name=skill.name,
                     reference=skill.reference,
                     description=skill.description,
+                    source_level=skill.source_level,
+                    source_path=skill.source_path,
                     base_dir=skill.base_dir,
                     source_hash=skill_hash,
                 )
@@ -552,6 +554,15 @@ def execution_plan_from_document(document: Mapping[str, Any]) -> ExecutionPlan:
                             name=str(item["name"]),
                             reference=str(item["reference"]),
                             description=str(item["description"]),
+                            source_level=str(item.get("source_level", "user")),
+                            source_path=Path(
+                                str(
+                                    item.get(
+                                        "source_path",
+                                        Path(str(item["base_dir"])) / "SKILL.md",
+                                    )
+                                )
+                            ),
                             base_dir=Path(str(item["base_dir"])),
                             source_hash=str(item["source_hash"]),
                         )

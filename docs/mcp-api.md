@@ -20,8 +20,8 @@
 | `describe_scenario` | `scenario_name` | полный scenario contract: metadata, inputs, agents, step definitions, dependencies, output schemas и result |
 | `list_agent_profiles` | — | агенты из `~/.gigacode/agents` с безопасными metadata |
 | `describe_agent_profile` | `agent_name` | metadata и system prompt одного агента |
-| `list_skill_profiles` | — | Skills из `~/.gigacode/skills` с безопасными metadata |
-| `describe_skill_profile` | `skill_name` | metadata и инструкции одного Skill |
+| `list_skill_profiles` | — | активные user/extension/bundled Skills, выбранный источник и `shadowed_sources` |
+| `describe_skill_profile` | `skill_name` | metadata, источник и инструкции выбранного Skill |
 | `validate_scenario` | ровно один из `scenario_name`, `inline_scenario_yaml` | schema validation |
 | `plan_scenario` | `workspace`, scenario, `inputs_yaml` | неизменяемый ExecutionPlan |
 | `diagnose_runtime` | `subprocess_smoke=false` | structured local diagnostics |

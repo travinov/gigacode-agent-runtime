@@ -48,11 +48,17 @@ agents:
 
 ## Skills
 
-`skill_refs` разрешает агенту только перечисленные Skills из
-`~/.gigacode/skills/<directory>/SKILL.md`. Отсутствующий или пустой список не
-наследует Skills пользователя. Runtime проверяет все ссылки до планирования,
-добавляет выбранные инструкции в system prompt и сохраняет hash каждого
-`SKILL.md` в `resource_hashes` с ключом `skill:gigacode:<name>`.
+`skill_refs` разрешает агенту только перечисленные Skills из объединённого
+каталога: `~/.gigacode/skills`, активных `~/.gigacode/extensions` и встроенных
+`~/.gigacode/bin/bundled`. `~/.gigacode/extension-sources` не сканируется.
+Отсутствующий или пустой список не наследует Skills пользователя. Runtime
+проверяет все ссылки до планирования, добавляет выбранные инструкции в system
+prompt и сохраняет hash каждого `SKILL.md` в `resource_hashes` с ключом
+`skill:gigacode:<name>`.
+
+При совпадении `name` приоритет имеет user Skill, затем активное extension,
+затем bundled Skill. На одном уровне предпочтителен каталог с именем, равным
+`name`; остальные кандидаты отображаются как `shadowed_sources`.
 
 Нативный tool `skill` для агента с `skill_refs` отключается, поэтому GigaCode не
 может автоматически выбрать незаявленный Skill через свой каталог. В

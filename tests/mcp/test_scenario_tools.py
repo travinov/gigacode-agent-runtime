@@ -261,6 +261,70 @@ async def test_skill_profiles_are_discovered_described_and_allowlisted(
     assert planned["data"]["agents"]["analyst"]["skills"][0]["reference"] == (
         "gigacode:requirements-review"
     )
+    assert planned["data"]["agents"]["analyst"]["skills"][0][
+        "source_level"
+    ] == "user"
     assert planned["data"]["resource_hashes"][
         "skill:gigacode:requirements-review"
     ].startswith("sha256:")
+
+
+@pytest.mark.anyio
+async def test_skill_profiles_include_extensions_bundled_and_shadowed_sources(
+    tmp_path: Path,
+) -> None:
+    gigacode = tmp_path / "home" / ".gigacode"
+    canonical = gigacode / "skills" / "bpmn-architect"
+    alias = gigacode / "skills" / "publish-bpmn-skill"
+    drawio = gigacode / "extensions" / "publish-drawio-skill"
+    service = (
+        gigacode
+        / "extensions"
+        / "service-extension"
+        / "skills"
+        / "service-analyst"
+    )
+    review = gigacode / "bin" / "bundled" / "review"
+    for directory, name in (
+        (canonical, "bpmn-architect"),
+        (alias, "bpmn-architect"),
+        (drawio, "drawio-skill"),
+        (service, "service-analyst"),
+        (review, "review"),
+    ):
+        directory.mkdir(parents=True)
+        (directory / "SKILL.md").write_text(
+            "---\n"
+            f"name: {name}\n"
+            f"description: {name} description.\n"
+            "---\n\n"
+            f"Apply {name}.\n"
+        )
+
+    tools = McpToolService(scheduler_config(tmp_path))
+    listed = await tools.list_skill_profiles()
+    described = await tools.describe_skill_profile("drawio-skill")
+
+    assert listed["ok"] is True
+    assert listed["data"]["catalog_roots"] == {
+        "user": str(gigacode / "skills"),
+        "extension": str(gigacode / "extensions"),
+        "bundled": str(gigacode / "bin" / "bundled"),
+    }
+    by_name = {
+        item["name"]: item for item in listed["data"]["skills"]
+    }
+    assert by_name["bpmn-architect"]["source_path"] == str(
+        (canonical / "SKILL.md").resolve()
+    )
+    assert by_name["bpmn-architect"]["shadowed_sources"] == [
+        {
+            "source_level": "user",
+            "source_path": str((alias / "SKILL.md").resolve()),
+            "canonical_directory": False,
+        }
+    ]
+    assert by_name["drawio-skill"]["source_level"] == "extension"
+    assert by_name["service-analyst"]["source_level"] == "extension"
+    assert by_name["review"]["source_level"] == "bundled"
+    assert described["data"]["instructions"] == "Apply drawio-skill."

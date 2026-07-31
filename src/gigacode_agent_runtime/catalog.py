@@ -42,4 +42,9 @@ def create_agent_profile_catalog(config: EffectiveConfig) -> AgentProfileCatalog
 
 
 def create_skill_profile_catalog(config: EffectiveConfig) -> SkillProfileCatalog:
-    return SkillProfileCatalog(config.paths.home / ".gigacode" / "skills")
+    gigacode_home = config.paths.home / ".gigacode"
+    return SkillProfileCatalog(
+        gigacode_home / "skills",
+        extension_root=gigacode_home / "extensions",
+        bundled_root=gigacode_home / "bin" / "bundled",
+    )

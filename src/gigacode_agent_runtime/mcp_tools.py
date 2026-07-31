@@ -265,12 +265,25 @@ class McpToolService:
             "name": profile.name,
             "skill_ref": profile.reference,
             "description": profile.description,
+            "source_level": profile.source_level,
             "source_path": str(profile.source_path),
+            "source_root": (
+                str(profile.source_root) if profile.source_root is not None else None
+            ),
             "base_dir": str(profile.base_dir),
+            "canonical_directory": profile.canonical_directory,
             "priority": profile.priority,
             "user_invocable": profile.user_invocable,
             "disable_model_invocation": profile.disable_model_invocation,
             "paths": list(profile.paths),
+            "shadowed_sources": [
+                {
+                    "source_level": shadowed.source_level,
+                    "source_path": str(shadowed.source_path),
+                    "canonical_directory": shadowed.canonical_directory,
+                }
+                for shadowed in profile.shadowed_profiles
+            ],
         }
         if include_instructions:
             document["instructions"] = profile.instructions
@@ -287,6 +300,11 @@ class McpToolService:
             ]
             return {
                 "catalog_root": str(self._skill_catalog.root),
+                "catalog_roots": {
+                    level: str(root)
+                    for level, root in self._skill_catalog.roots.items()
+                },
+                "selection_policy": "user > extension > bundled; canonical directory wins ties",
                 "skills": profiles,
             }
 

@@ -39,7 +39,7 @@ TOOL_DESCRIPTIONS = {
         "metadata, model hint, and tool declarations."
     ),
     "list_skill_profiles": (
-        "List reusable native GigaCode Skills discovered in ~/.gigacode/skills."
+        "List active native GigaCode Skills from user, extension, and bundled sources."
     ),
     "describe_skill_profile": (
         "Return one reusable GigaCode Skill, including its instructions, metadata, "

@@ -225,6 +225,8 @@ def test_skill_refs_inject_only_selected_skill_and_record_provenance(
     assert [skill.reference for skill in agent.skills] == [
         "gigacode:requirements-review"
     ]
+    assert agent.skills[0].source_level == "user"
+    assert agent.skills[0].source_path == (selected / "SKILL.md").resolve()
     assert agent.skills[0].source_hash == plan.resource_hashes[
         "skill:gigacode:requirements-review"
     ]

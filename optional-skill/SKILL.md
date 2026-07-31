@@ -21,8 +21,8 @@ subagent calls.
   scenario. Keep model IDs and permissions explicit in the scenario.
 - Discover installed GigaCode Skills with `list_skill_profiles` and
   `describe_skill_profile`. Grant only the required Skills to each agent with
-  `skill_refs: [gigacode:<name>]`; never assume the full user catalog is
-  inherited.
+  `skill_refs: [gigacode:<name>]`; inspect `source_level`, `source_path`, and
+  `shadowed_sources`, and never assume the full active catalog is inherited.
 - Prefer the installed `corporate-sequential`, `corporate-parallel`,
   `corporate-mixed`, `corporate-review-repair-loop`, `corporate-agent-ref`, or
   `corporate-skill-ref`

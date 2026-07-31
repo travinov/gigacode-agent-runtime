@@ -400,8 +400,18 @@ def _execute(arguments: argparse.Namespace, config: EffectiveConfig) -> int:
                     "name": profile.name,
                     "skill_ref": profile.reference,
                     "description": profile.description,
+                    "source_level": profile.source_level,
                     "source_path": str(profile.source_path),
+                    "canonical_directory": profile.canonical_directory,
                     "priority": profile.priority,
+                    "shadowed_sources": [
+                        {
+                            "source_level": shadowed.source_level,
+                            "source_path": str(shadowed.source_path),
+                            "canonical_directory": shadowed.canonical_directory,
+                        }
+                        for shadowed in profile.shadowed_profiles
+                    ],
                 }
                 for profile in sorted(
                     skill_catalog.discover().values(),
@@ -409,7 +419,17 @@ def _execute(arguments: argparse.Namespace, config: EffectiveConfig) -> int:
                 )
             ]
             emit(
-                {"catalog_root": str(skill_catalog.root), "skills": skill_documents},
+                {
+                    "catalog_root": str(skill_catalog.root),
+                    "catalog_roots": {
+                        level: str(root)
+                        for level, root in skill_catalog.roots.items()
+                    },
+                    "selection_policy": (
+                        "user > extension > bundled; canonical directory wins ties"
+                    ),
+                    "skills": skill_documents,
+                },
                 as_json=as_json,
             )
         else:
@@ -419,12 +439,27 @@ def _execute(arguments: argparse.Namespace, config: EffectiveConfig) -> int:
                     "name": skill_profile.name,
                     "skill_ref": skill_profile.reference,
                     "description": skill_profile.description,
+                    "source_level": skill_profile.source_level,
                     "priority": skill_profile.priority,
                     "user_invocable": skill_profile.user_invocable,
                     "disable_model_invocation": skill_profile.disable_model_invocation,
                     "paths": list(skill_profile.paths),
                     "source_path": str(skill_profile.source_path),
+                    "source_root": (
+                        str(skill_profile.source_root)
+                        if skill_profile.source_root is not None
+                        else None
+                    ),
                     "base_dir": str(skill_profile.base_dir),
+                    "canonical_directory": skill_profile.canonical_directory,
+                    "shadowed_sources": [
+                        {
+                            "source_level": shadowed.source_level,
+                            "source_path": str(shadowed.source_path),
+                            "canonical_directory": shadowed.canonical_directory,
+                        }
+                        for shadowed in skill_profile.shadowed_profiles
+                    ],
                     "instructions": skill_profile.instructions,
                 },
                 as_json=as_json,

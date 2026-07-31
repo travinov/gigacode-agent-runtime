@@ -82,6 +82,8 @@ class SkillDefinition:
     name: str
     reference: str
     description: str
+    source_level: str
+    source_path: Path
     base_dir: Path
     source_hash: str
 

@@ -111,8 +111,15 @@ def test_skills_list_and_describe_use_native_user_catalog(tmp_path: Path) -> Non
     )
 
     assert listed.returncode == 0, listed.stderr
-    assert json.loads(listed.stdout)["skills"][0]["skill_ref"] == (
+    listed_document = json.loads(listed.stdout)
+    assert listed_document["skills"][0]["skill_ref"] == (
         "gigacode:requirements-review"
     )
+    assert listed_document["skills"][0]["source_level"] == "user"
+    assert set(listed_document["catalog_roots"]) == {
+        "user",
+        "extension",
+        "bundled",
+    }
     assert described.returncode == 0, described.stderr
     assert json.loads(described.stdout)["instructions"] == "Return a gap analysis."

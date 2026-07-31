@@ -63,6 +63,85 @@ def test_catalog_discovers_skills_by_front_matter_name(tmp_path: Path) -> None:
     )
 
 
+def test_composite_catalog_discovers_only_active_gigacode_sources(
+    tmp_path: Path,
+) -> None:
+    gigacode = tmp_path / ".gigacode"
+    user = gigacode / "skills"
+    extensions = gigacode / "extensions"
+    bundled = gigacode / "bin" / "bundled"
+
+    canonical = user / "bpmn-architect"
+    alias = user / "publish-bpmn-skill"
+    drawio = extensions / "publish-drawio-skill"
+    service = extensions / "service-extension" / "skills" / "service-analyst"
+    review = bundled / "review"
+    historical = (
+        gigacode
+        / "extension-sources"
+        / "publish-drawio-skill"
+        / "1.0.0"
+    )
+    for directory in (canonical, alias, drawio, service, review, historical):
+        directory.mkdir(parents=True)
+    (user / "SKILL.md").write_text(_skill("root-manifest"))
+    (canonical / "SKILL.md").write_text(_skill("bpmn-architect"))
+    (alias / "SKILL.md").write_text(_skill("bpmn-architect"))
+    (drawio / "SKILL.md").write_text(_skill("drawio-skill"))
+    (service / "SKILL.md").write_text(_skill("service-analyst"))
+    (review / "SKILL.md").write_text(_skill("review"))
+    (historical / "SKILL.md").write_text(_skill("historical-drawio"))
+
+    catalog = SkillProfileCatalog(
+        user,
+        extension_root=extensions,
+        bundled_root=bundled,
+    )
+    profiles = catalog.discover()
+
+    assert list(profiles) == [
+        "bpmn-architect",
+        "drawio-skill",
+        "review",
+        "service-analyst",
+    ]
+    assert profiles["bpmn-architect"].source_path == (
+        canonical / "SKILL.md"
+    ).resolve()
+    assert profiles["bpmn-architect"].source_level == "user"
+    assert [
+        profile.source_path
+        for profile in profiles["bpmn-architect"].shadowed_profiles
+    ] == [(alias / "SKILL.md").resolve()]
+    assert profiles["drawio-skill"].source_level == "extension"
+    assert profiles["service-analyst"].source_level == "extension"
+    assert profiles["review"].source_level == "bundled"
+    assert "historical-drawio" not in profiles
+    assert "root-manifest" not in profiles
+
+
+def test_user_skill_overrides_extension_and_bundled_sources(tmp_path: Path) -> None:
+    user = tmp_path / "skills"
+    extensions = tmp_path / "extensions"
+    bundled = tmp_path / "bundled"
+    for root in (user, extensions, bundled):
+        directory = root / "shared"
+        directory.mkdir(parents=True)
+        (directory / "SKILL.md").write_text(_skill("shared"))
+
+    profile = SkillProfileCatalog(
+        user,
+        extension_root=extensions,
+        bundled_root=bundled,
+    ).load("shared")
+
+    assert profile.source_level == "user"
+    assert [item.source_level for item in profile.shadowed_profiles] == [
+        "extension",
+        "bundled",
+    ]
+
+
 def test_missing_skill_has_stable_error(tmp_path: Path) -> None:
     with pytest.raises(AgentRuntimeError) as captured:
         SkillProfileCatalog(tmp_path / "missing").load("missing-skill")

@@ -52,6 +52,18 @@ gigacode mcp list
 возвращает полные поля `kind`, `needs`, `prompt` и `output_schema`, а ответы
 имеют envelope `ok/data` или `ok/error`.
 
+`list_skill_profiles` должен дополнительно показать фактический источник:
+
+- `drawio-skill`, `service-analyst` и `knowledge-curator` —
+  `source_level: extension`;
+- `review` — `source_level: bundled`;
+- пользовательские Skills — `source_level: user`.
+
+Ни один выбранный `source_path` или `shadowed_sources` не должен указывать на
+`~/.gigacode/extension-sources`. Если одинаковый `name` найден несколько раз,
+MCP обязан вернуть один выбранный профиль и остальные в `shadowed_sources`, не
+отключая весь каталог.
+
 ## 5. Проверить автоматически установленный профиль
 
 Installer должен уже положить конфигурацию и готовые сценарии в user catalog:
@@ -64,6 +76,11 @@ test -f "$HOME/.gigacode/skills/runtime-skill-probe/SKILL.md"
 agent-runtime agents list --json
 agent-runtime skills list --json
 ```
+
+В выводе `skills list` проверьте `catalog_roots`, `source_level`,
+`source_path`, `canonical_directory` и `shadowed_sources`. Для
+`bpmn-architect` после удаления старого дубликата должна остаться одна активная
+запись.
 
 Проверьте готовые файлы без копирования или редактирования:
 
