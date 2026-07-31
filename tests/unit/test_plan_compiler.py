@@ -34,6 +34,11 @@ def test_sequential_and_parallel_scenarios_compile_to_expected_waves(tmp_path: P
 
     assert sequential.waves == (("create",), ("review",))
     assert parallel.waves == (("analyze_first", "analyze_second"), ("review",))
+    assert "approval_default" in sequential.capability_requirements
+    assert "approval_plan" not in sequential.capability_requirements
+    assert "agent_isolation" in sequential.capability_requirements
+    assert "prompt" in sequential.capability_requirements
+    assert "stream_json" not in sequential.capability_requirements
     validate_document("execution-plan-v1", execution_plan_to_document(parallel))
 
 

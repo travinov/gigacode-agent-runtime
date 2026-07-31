@@ -546,22 +546,24 @@ inputs:
 
 | Значение | Поведение |
 |---|---|
-| `read_only` | Анализ без изменения workspace; GigaCode запускается в plan mode. |
-| `propose_only` | Подготовка текста или структурированного предложения без применения изменений; также plan mode. |
+| `read_only` | Анализ без изменения workspace; GigaCode запускается в обычном approval mode `default`, но без tools, MCP и extensions. |
+| `propose_only` | Подготовка текста или структурированного предложения без применения изменений; используется тот же изолированный режим `default`. |
 | `workspace_write` | Разрешены изменения внутри workspace; GigaCode запускается в auto-edit с sandbox. |
 | `full_access` | Расширенный auto-edit режим. Требует глобального разрешения и, как правило, подтверждения точного `plan_hash`. |
 
-В v1 `read_only` и `propose_only` используют одинаковый технический plan mode,
-но сохраняются как разные намерения сценария. Ограничение `allowed_tools`
-применяется адаптером только к `full_access`.
+В v1 `read_only` и `propose_only` используют одинаковый технический профиль,
+но сохраняются как разные намерения сценария. Нативный `approval-mode plan` не
+используется: он включает интерактивный Plan Mode Qwen и требует
+`exit_plan_mode`, что несовместимо с изолированным структурированным агентом.
+Ограничение `allowed_tools` применяется адаптером только к `full_access`.
 
-Если у агента нет эффективного full-access `allowed_tools`, runtime запускает
-его в изолированном контексте: отключает наследуемые extensions, глобальные MCP,
-skills и core tools. Это предотвращает рекурсивный вызов самого runtime и не
-расходует контекст модели на схемы посторонних инструментов. Для такого запуска
-GigaCode CLI должен поддерживать `--extensions`, `--max-session-turns`,
-`--core-tools`, `--allowed-mcp-server-names` и `--exclude-tools`; отсутствие
-любой из этих возможностей приводит к fail-closed `CAPABILITY_UNAVAILABLE`.
+Для `read_only` и `propose_only` runtime отключает наследуемые extensions,
+глобальные MCP, skills и core tools. Это предотвращает рекурсивный вызов самого
+runtime и не расходует контекст модели на схемы посторонних инструментов. Для
+такого запуска GigaCode CLI должен поддерживать `--extensions`,
+`--max-session-turns`, `--core-tools`, `--allowed-mcp-server-names` и
+`--exclude-tools`; отсутствие любой из этих возможностей приводит к fail-closed
+`CAPABILITY_UNAVAILABLE`.
 
 Роль можно вынести в файл рядом со сценарием:
 

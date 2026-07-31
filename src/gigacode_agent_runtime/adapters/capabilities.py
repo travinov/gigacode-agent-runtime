@@ -50,6 +50,7 @@ class GigaCodeCapabilities:
             "system_prompt": self.system_prompt,
             "prompt": self.prompt,
             "approval_plan": "plan" in self.approval_modes,
+            "approval_default": "default" in self.approval_modes,
             "approval_auto_edit": "auto-edit" in self.approval_modes,
             "allowed_tools": self.allowed_tools,
             "sandbox": self.sandbox,

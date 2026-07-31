@@ -289,7 +289,9 @@ async def _capabilities_check(
     required = {
         "model_selection",
         "system_prompt",
-        "approval_plan",
+        "prompt",
+        "agent_isolation",
+        "approval_default",
         "approval_auto_edit",
         "json_output",
     }

@@ -96,6 +96,7 @@ async def test_workspace_write_uses_sandbox_and_workspace_cwd(tmp_path: Path) ->
     ]
     assert result.output["summary"] == "fake success"
     assert "--sandbox" in traces[-1]["argv"]
+    assert "--core-tools" not in traces[-1]["argv"]
     approval_index = traces[-1]["argv"].index("--approval-mode")
     assert traces[-1]["argv"][approval_index + 1] == "auto-edit"
 
@@ -129,8 +130,36 @@ async def test_adapter_uses_prompt_stream_output_schema_and_no_tool_isolation(
     assert "--extensions" in argv
     assert "--core-tools" in argv
     assert "--allowed-mcp-server-names" in argv
+    approval_index = argv.index("--approval-mode")
+    assert argv[approval_index + 1] == "default"
+    assert "plan" not in argv
     assert invocation["stdin_empty"] is True
     assert invocation["system_prompt_has_output_contract"] is True
+
+
+@pytest.mark.anyio
+async def test_safe_agent_contract_explicitly_forbids_native_plan_mode(
+    tmp_path: Path,
+) -> None:
+    adapter = _adapter(tmp_path, "success")
+    capabilities = await adapter.detect_capabilities()
+    request = _request(tmp_path)
+    request = AgentRequest(
+        model=request.model,
+        system_prompt=request.system_prompt,
+        prompt=request.prompt,
+        permission=PermissionMode.PROPOSE_ONLY,
+        allowed_tools=(),
+        workspace=request.workspace,
+        output_schema=request.output_schema,
+    )
+
+    command, input_text, output_format = adapter._command(request, capabilities)
+    system_prompt = str(command[command.index("--system-prompt") + 1])
+
+    assert "Do not enter Plan Mode or call exit_plan_mode" in system_prompt
+    assert input_text == ""
+    assert output_format == "stream-json"
 
 
 @pytest.mark.anyio

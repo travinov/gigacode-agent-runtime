@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.0-rc.10] - 2026-07-31
+
+### Fixed
+
+- Run `read_only` and `propose_only` child agents with GigaCode approval mode
+  `default` instead of native `plan`, while retaining the empty tool, MCP, and
+  extension profile that makes those agents effectively read-only.
+- Prevent native Qwen Plan Mode from requesting the unavailable
+  `exit_plan_mode` tool and repeating output intentions until the API closes the
+  response.
+- Add an explicit bounded-child instruction that prohibits Plan Mode,
+  delegation, tools, shell, and filesystem operations for safe agents.
+- Correct execution-plan capability requirements to describe `--prompt`, JSON
+  output, default approval, and no-tool isolation instead of the removed
+  stream-JSON input contract.
+
 ## [1.0.0-rc.9] - 2026-07-31
 
 ### Fixed

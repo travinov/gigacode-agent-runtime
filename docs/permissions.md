@@ -10,6 +10,13 @@ Permission задаётся отдельно для каждого агента 
 | `workspace_write` | изменение файлов внутри workspace с sandbox GigaCode |
 | `full_access` | расширенный режим GigaCode с явным разрешением runtime |
 
+`read_only` и `propose_only` используют `--approval-mode default`, но runtime
+одновременно передаёт пустой core-tool allowlist, пустой MCP allowlist,
+`--extensions none` и denylist инструментов. Поэтому отсутствие изменений
+обеспечивается фактическим нулевым набором инструментов, а не нативным Plan Mode
+Qwen. Режим `plan` не применяется к дочерним структурированным агентам, потому
+что он требует интерактивный `exit_plan_mode`.
+
 ## Full access
 
 Возможность включается явно:

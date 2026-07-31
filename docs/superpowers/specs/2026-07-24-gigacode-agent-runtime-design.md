@@ -773,12 +773,11 @@ Adapter является единственной точкой, знающей C
 
 ### 15.2 Вызов агента
 
-Предпочтительный режим — передача request через stdin с
-`--input-format stream-json` и получение `--output-format stream-json`. Это не
-размещает пользовательский prompt в строке процесса. Если конкретная
-подтверждённая версия не поддерживает такой контракт, adapter использует
-позиционный prompt и JSON output с диагностическим предупреждением. Deprecated
-`--prompt` не используется без необходимости.
+Подтверждённый корпоративный контракт Qwen Code 0.13.1 передаёт request через
+`--prompt` и использует `stream-json` только для вывода. Входной
+`--input-format stream-json` не применяется: фактический CLI не принимает
+использовавшийся ранее message envelope. Если stream output недоступен, adapter
+использует JSON output.
 
 Команда строится массивом аргументов без shell:
 
@@ -787,13 +786,16 @@ gigacode
   --model <model>
   --system-prompt <resolved prompt>
   --approval-mode <mapped mode>
-  --input-format stream-json
+  --prompt <rendered request>
   --output-format stream-json
 ```
 
-User request в этом режиме поступает в stdin. Фактический порядок и флаги
-формирует adapter из capability profile. Строка команды не выполняется через
-`shell=True`; полные prompt-аргументы не печатаются в журнал.
+Для `read_only` и `propose_only` mapped mode равен `default`, а фактическое
+ограничение обеспечивается пустыми tools/MCP/extensions. Нативный `plan` не
+используется, поскольку включает интерактивный Plan Mode с требованием
+`exit_plan_mode`. Фактический порядок и флаги формирует adapter из capability
+profile. Строка команды не выполняется через `shell=True`; полные
+prompt-аргументы не печатаются в журнал.
 
 ### 15.3 Завершение и отмена
 

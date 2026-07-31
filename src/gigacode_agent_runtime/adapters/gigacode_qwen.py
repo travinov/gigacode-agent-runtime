@@ -151,33 +151,40 @@ class GigaCodeQwenAdapter:
         )
 
     @staticmethod
-    def _uses_allowed_tools(request: AgentRequest) -> bool:
-        return request.permission is PermissionMode.FULL_ACCESS and bool(
-            request.allowed_tools
-        )
+    def _requires_no_tool_isolation(request: AgentRequest) -> bool:
+        return request.permission in {
+            PermissionMode.READ_ONLY,
+            PermissionMode.PROPOSE_ONLY,
+        }
 
     def _required_capabilities(self, request: AgentRequest) -> set[str]:
         required = {"model_selection", "system_prompt", "prompt"}
-        if not self._uses_allowed_tools(request):
+        if self._requires_no_tool_isolation(request):
             required.add("agent_isolation")
         if request.permission in {PermissionMode.READ_ONLY, PermissionMode.PROPOSE_ONLY}:
-            required.add("approval_plan")
+            required.add("approval_default")
         elif request.permission is PermissionMode.WORKSPACE_WRITE:
             required.update({"approval_auto_edit", "sandbox"})
         elif request.permission is PermissionMode.FULL_ACCESS:
             required.update({"approval_auto_edit", "allowed_tools"})
         return required
 
-    @staticmethod
-    def _system_prompt(request: AgentRequest) -> str:
-        return (
-            f"{request.system_prompt.rstrip()}\n\n"
+    def _system_prompt(self, request: AgentRequest) -> str:
+        sections = [request.system_prompt.rstrip()]
+        if self._requires_no_tool_isolation(request):
+            sections.append(
+                "You are a bounded non-interactive child agent. Do not enter Plan "
+                "Mode or call exit_plan_mode. Do not call or delegate to agents, "
+                "tools, skills, MCP servers, shell commands, or filesystem operations."
+            )
+        sections.append(
             "## Runtime output contract\n"
             "Return exactly one JSON object and no prose. The object must validate "
             "against this JSON Schema. Do not wrap the object in Markdown unless "
             "the CLI does so automatically.\n"
             f"{canonical_json(request.output_schema)}"
         )
+        return "\n\n".join(sections)
 
     def _captured_error(
         self,
@@ -209,7 +216,7 @@ class GigaCodeQwenAdapter:
             "--approval-mode",
         ]
         if request.permission in {PermissionMode.READ_ONLY, PermissionMode.PROPOSE_ONLY}:
-            argv.append("plan")
+            argv.append("default")
         else:
             argv.append("auto-edit")
         if request.permission is PermissionMode.WORKSPACE_WRITE:
@@ -217,7 +224,7 @@ class GigaCodeQwenAdapter:
         if request.permission is PermissionMode.FULL_ACCESS and request.allowed_tools:
             argv.extend(["--allowed-tools", ",".join(request.allowed_tools)])
 
-        if not self._uses_allowed_tools(request):
+        if self._requires_no_tool_isolation(request):
             argv.extend(
                 [
                     "--extensions",

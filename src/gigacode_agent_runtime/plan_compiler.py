@@ -282,10 +282,10 @@ def _validate_reference_targets(
 
 
 def _capability_requirements(agents: Mapping[str, AgentDefinition]) -> tuple[str, ...]:
-    capabilities = {"model_selection", "stream_json", "system_prompt"}
+    capabilities = {"json_output", "model_selection", "prompt", "system_prompt"}
     permissions = {agent.permissions for agent in agents.values()}
     if permissions & {PermissionMode.READ_ONLY, PermissionMode.PROPOSE_ONLY}:
-        capabilities.add("approval_plan")
+        capabilities.update({"agent_isolation", "approval_default"})
     if PermissionMode.WORKSPACE_WRITE in permissions:
         capabilities.update({"approval_auto_edit", "sandbox"})
     if PermissionMode.FULL_ACCESS in permissions:

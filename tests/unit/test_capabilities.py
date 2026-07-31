@@ -40,6 +40,7 @@ def test_qwen_help_is_parsed_by_feature_not_only_version() -> None:
     assert capabilities.stream_output is True
     assert capabilities.prompt is True
     assert capabilities.agent_isolation is True
+    assert capabilities.available("approval_default") is True
     assert capabilities.approval_modes == frozenset({"plan", "default", "auto-edit"})
     assert capabilities.mcp is True
 
@@ -51,6 +52,7 @@ def test_unknown_help_does_not_claim_dangerous_capabilities() -> None:
     assert capabilities.allowed_tools is False
     assert capabilities.prompt is False
     assert capabilities.agent_isolation is False
+    assert capabilities.available("approval_default") is False
     assert capabilities.approval_modes == frozenset()
 
 
