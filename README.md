@@ -27,14 +27,15 @@ Linux не является поддерживаемой платформой v1
 4. [Где создавать сценарии и агентов](#где-создавать-сценарии-и-агентов)
 5. [Первый последовательный сценарий](#первый-последовательный-сценарий)
 6. [Проверка и запуск сценария](#проверка-и-запуск-сценария)
-7. [Полный справочник формата сценария](#полный-справочник-формата-сценария)
-8. [Виды шагов: `agent` и `loop`](#виды-шагов-agent-и-loop)
-9. [Последовательность, параллельность и fan-in](#последовательность-параллельность-и-fan-in)
-10. [Условия](#условия)
-11. [Циклы и число итераций](#циклы-и-число-итераций)
-12. [Вызов через MCP из GigaCode](#вызов-через-mcp-из-gigacode)
-13. [Мониторинг и продолжение запуска](#мониторинг-и-продолжение-запуска)
-14. [Диагностика типовых ошибок](#диагностика-типовых-ошибок)
+7. [Как заполнять JSON, списки и выражения в Runtime Studio](#как-заполнять-json-списки-и-выражения-в-runtime-studio)
+8. [Полный справочник формата сценария](#полный-справочник-формата-сценария)
+9. [Виды шагов: `agent` и `loop`](#виды-шагов-agent-и-loop)
+10. [Последовательность, параллельность и fan-in](#последовательность-параллельность-и-fan-in)
+11. [Условия](#условия)
+12. [Циклы и число итераций](#циклы-и-число-итераций)
+13. [Вызов через MCP из GigaCode](#вызов-через-mcp-из-gigacode)
+14. [Мониторинг и продолжение запуска](#мониторинг-и-продолжение-запуска)
+15. [Диагностика типовых ошибок](#диагностика-типовых-ошибок)
 
 ## Как это работает
 
@@ -605,6 +606,145 @@ agent-runtime run corporate-sequential \
 Для повторной отправки той же задачи используйте тот же `idempotency_key`.
 Повтор ключа с другим планом отклоняется как `IDEMPOTENCY_CONFLICT`.
 
+## Как заполнять JSON, списки и выражения в Runtime Studio
+
+Поля Studio используют несколько разных форматов. Надпись `(JSON)` означает,
+что значение разбирается как JSON, но остальные структурированные поля могут
+ожидать список через запятую, несколько строк или Runtime-выражение. JSON array
+нельзя использовать вместо списка через запятую, если поле явно этого не
+предлагает.
+
+### Какой формат ожидает каждое поле
+
+| Поле Studio | Формат ввода | Пример |
+|---|---|---|
+| Input → Default | Одно JSON-значение или обычный текст | `true`, `10`, `["api", "security"]`, `Обычный текст` |
+| Prompt context (JSON) | Только JSON object | `{"mode": "strict", "threshold": 0.95}` |
+| Output schema (JSON) | Только JSON Schema object | `{"type": "object", "properties": {...}}` |
+| Condition/Until → Value (JSON) | Одно JSON-значение или обычный текст | `true`, `80`, `"approved"`, `["a", "b"]` |
+| Needs | Имена шагов через запятую | `draft, security_review` |
+| Allowed tools сценария | Tool ID через запятую | `read_file, search_files` |
+| Retry → Backoff | Числа через запятую | `2, 10` |
+| Retry → Retry on | Типы ошибок через запятую | `invalid_output, transient_cli_error` |
+| Model/environment allowlist в Config | Одно значение на строку | `vllm/Qwen3.6-35B-262k` |
+| Tools/disallowedTools native agent | Один tool ID на строку | `run_shell_command` |
+| Skills агента сценария | Выбор из списка; Cmd/Ctrl для нескольких | `openspec-teach` |
+| No progress fingerprint | Одно Runtime-выражение на строку | `${loop.steps.review.output.feedback}` |
+| Prompt template | Текст с Runtime-выражениями | `Проверь ${inputs.task}` |
+| Condition/Until → Ref | Одно Runtime-выражение | `${steps.review.output.approved}` |
+| Result → From expression | Одно Runtime-выражение результата | `${steps.finalize.output}` |
+
+### Input → Default
+
+Default должен соответствовать выбранному `Type`. Поле сначала пытается
+прочитать значение как JSON, а если это невозможно — сохраняет его как обычную
+строку.
+
+| Type | Что ввести в Default |
+|---|---|
+| `string` | `Проверь спецификацию` или `"Проверь спецификацию"` |
+| `boolean` | `true` или `false` без кавычек |
+| `integer` | `10` |
+| `number` | `0.95` |
+| `array` | `["security", "api"]` |
+| `object` | `{"mode": "strict", "max_findings": 10}` |
+
+Значения `true`, `false`, `null` и числа без кавычек являются JSON-типами. Если
+нужна именно строка `"true"` или `"10"`, используйте кавычки.
+
+### Prompt context (JSON)
+
+`Prompt context` принимает только object на верхнем уровне. Массив, строка,
+число или boolean на верхнем уровне отклоняются. Runtime добавляет object к
+prompt как канонический блок `Context`:
+
+```json
+{
+  "workspace": "${workspace.root}",
+  "mode": "strict",
+  "limits": {
+    "max_findings": 10
+  },
+  "checks": ["security", "compatibility"]
+}
+```
+
+Runtime-интерполяция в `context` применяется к строковым значениям верхнего
+уровня, как `workspace` в примере. Для передачи полного результата предыдущего
+шага используйте верхнеуровневое поле:
+
+```json
+{
+  "draft": "${steps.draft.output}"
+}
+```
+
+Пустой object `{}` эквивалентен отсутствующему дополнительному context.
+
+### Condition/Until → Value (JSON)
+
+Тип Value должен совпадать с типом значения, полученного по `Ref`:
+
+| Проверка | Ref | Operator | Value |
+|---|---|---|---|
+| Boolean-флаг | `${steps.review.output.approved}` | `eq` | `true` |
+| Числовой порог | `${steps.review.output.score}` | `gte` | `80` |
+| Строковый статус | `${steps.review.output.status}` | `eq` | `"approved"` |
+| Наличие элемента | `${steps.review.output.tags}` | `contains` | `"security"` |
+| Наличие результата | `${steps.review.output}` | `exists` | `true` |
+
+Не вводите `"true"`, если сравниваете boolean: строка `"true"` и boolean
+`true` имеют разные типы. Аналогично число `80` отличается от строки `"80"`.
+
+### Списки и многострочные поля
+
+В полях **Needs**, **Allowed tools**, **Backoff** и **Retry on** используется
+список через запятую без JSON-квадратных скобок:
+
+```text
+invalid_output, transient_cli_error
+```
+
+В allowlist конфигурации, tools native agent и fingerprint loop используется
+одно значение на строку:
+
+```text
+read_file
+search_files
+run_shell_command
+```
+
+Поле **Skills** не является текстовым JSON-полем: выбирайте значения из
+каталога. На macOS удерживайте Cmd, на Linux/Windows — Ctrl, чтобы назначить
+несколько Skills.
+
+### Runtime-выражения `${...}`
+
+Выражения связывают входы, шаги и результат. В Studio они вводятся как обычный
+текст без JSON-кавычек:
+
+| Выражение | Значение |
+|---|---|
+| `${inputs.task}` | Значение входа `task` |
+| `${steps.analyze.output}` | Весь output шага `analyze` |
+| `${steps.analyze.output.score}` | Поле `score` из output |
+| `${loop.iteration}` | Номер текущей итерации loop |
+| `${loop.steps.review.output}` | Output шага текущей итерации |
+| `${loop.previous.review.output}` | Output шага предыдущей итерации |
+| `${run.id}` | ID текущего запуска |
+| `${workspace.root}` | Корень workspace запуска |
+
+`Prompt template` может содержать выражение внутри текста. Поля
+`Condition ref`, `Until ref` и `Result.from` должны содержать одну допустимую
+ссылку.
+`Needs` управляет только порядком выполнения и не передаёт output; данные
+предыдущего шага передаются через выражение в prompt или context.
+
+Перед Apply используйте **Проверить и сохранить**. Первый этап выполняет
+валидацию и показывает diff, но ещё не записывает файл. Проверка подтверждает
+синтаксис и связи сценария, однако способность модели стабильно выполнить
+контракт нужно отдельно проверять реальным тестовым запуском.
+
 ## Полный справочник формата сценария
 
 ### Верхний уровень
@@ -826,6 +966,126 @@ prompt:
 Каждый agent step обязан вернуть JSON object, соответствующий JSON Schema
 Draft 2020-12.
 
+`output_schema` — это контракт между сценарием и моделью: он описывает не
+сам ответ, а допустимую структуру ответа. Runtime передаёт контракт агенту,
+извлекает итоговый JSON object и проверяет его до публикации результата шага.
+
+#### Как составить `Output schema (JSON)` в Studio
+
+1. Выпишите поля, которые обязательно должны быть в результате шага.
+2. Для каждого поля выберите тип из таблицы ниже.
+3. Добавьте обязательные поля одновременно в `properties` и `required`.
+4. Используйте `additionalProperties: false`, если модель не должна добавлять
+   поля, не предусмотренные контрактом.
+5. Убедитесь, что prompt явно просит вернуть данные, описанные схемой.
+6. Для первого запуска добавьте ограниченный retry на `invalid_output`.
+
+| Ожидаемое значение | JSON Schema | Пример результата |
+|---|---|---|
+| Текст | `{"type": "string"}` | `"openspec-explore"` |
+| Целое число | `{"type": "integer"}` | `3` |
+| Любое число | `{"type": "number"}` | `0.75` |
+| Да/нет | `{"type": "boolean"}` | `true` |
+| Список строк | `{"type": "array", "items": {"type": "string"}}` | `["a", "b"]` |
+| Вложенная структура | `{"type": "object", "properties": {...}}` | `{"risk": "high"}` |
+| Одно из фиксированных значений | `{"type": "string", "enum": ["low", "medium", "high"]}` | `"high"` |
+| Строка или отсутствие значения | `{"type": ["string", "null"]}` | `null` |
+
+В поле **Output schema (JSON)** в Studio вставляется именно JSON без
+`output_schema:` и без окружающего Markdown-блока. Например, проверенный
+контракт для учебного OpenSpec-агента:
+
+```json
+{
+  "type": "object",
+  "required": [
+    "answer",
+    "current_stage",
+    "recommended_skill",
+    "reason",
+    "required_inputs"
+  ],
+  "properties": {
+    "answer": {
+      "type": "string"
+    },
+    "current_stage": {
+      "type": "string"
+    },
+    "recommended_skill": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "required_inputs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+Для необязательного поля достаточно оставить его в `properties`, но не
+добавлять в `required`. Если поле должно присутствовать всегда, но иногда не
+иметь значения, включите его в `required` и разрешите `null`:
+
+```json
+{
+  "type": "object",
+  "required": ["summary", "blocking_issue"],
+  "properties": {
+    "summary": {
+      "type": "string"
+    },
+    "blocking_issue": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+Пример массива структурированных замечаний с фиксированной серьёзностью:
+
+```json
+{
+  "type": "object",
+  "required": ["approved", "findings"],
+  "properties": {
+    "approved": {
+      "type": "boolean"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "message"],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+#### Та же схема в YAML-сценарии
+
+В YAML-файле сценария JSON Schema записывается как обычный YAML object. Здесь
+префикс `output_schema:` уже нужен:
+
 Встроенная схема:
 
 ```yaml
@@ -845,6 +1105,35 @@ output_schema:
 ```yaml
 output_schema: schemas/review.json
 ```
+
+Относительный путь разрешается от каталога YAML-сценария. Отдельный файл
+удобен, когда один контракт большой или используется несколькими шагами.
+
+#### Частые ошибки
+
+| Ошибка | Что произойдёт | Как исправить |
+|---|---|---|
+| Поле есть в `required`, но отсутствует в `properties` | Preview или выполнение отклонит некорректный контракт | Добавьте описание поля в `properties` |
+| Prompt просит текст, а схема требует object | Модель часто вернёт `invalid_output` | Перечислите ожидаемые поля в prompt |
+| Для списка не задан `items` | Элементы списка не имеют проверяемого типа | Добавьте schema каждого элемента в `items` |
+| Число описано как `string` | Ответ `3` не пройдёт проверку | Используйте `integer` или `number` |
+| Необязательное поле ошибочно добавлено в `required` | Пропущенное моделью поле вызовет `invalid_output` | Удалите его из `required` или разрешите `null` |
+| Нет `additionalProperties: false` | Модель сможет вернуть лишние поля | Закройте object, если расширение контракта не нужно |
+| В Studio вставлен YAML или окружающий Markdown-блок | Поле не распарсится как JSON | Вставьте только JSON object от `{` до `}` |
+
+Для простого шага разумная начальная retry policy:
+
+```yaml
+retry:
+  max_attempts: 2
+  backoff_seconds: [2]
+  on: [invalid_output, transient_cli_error]
+```
+
+Retry помогает при единичной ошибке формата, но не исправляет противоречие
+между prompt и схемой. Если обе попытки завершаются как `invalid_output`,
+сначала сравните ожидаемые поля, типы и обязательность в prompt и
+`output_schema`.
 
 Если модель вернула обычный текст, пропустила обязательное поле или изменила
 тип поля, шаг завершается как `invalid_output`. Эту ошибку можно явно включить
@@ -1241,6 +1530,125 @@ candidate из предыдущей итерации.
 
 ## Вызов через MCP из GigaCode
 
+### Что должен написать обычный пользователь
+
+Пользователь вызывает не отдельный Python-процесс и не модель, а именованный
+сценарий Runtime. Сценарий уже определяет:
+
+- reusable agents и их system prompts;
+- точную модель каждого Runtime-агента;
+- доступные Skills и tools;
+- permissions;
+- последовательные, параллельные и циклические шаги;
+- контракт структурированного результата.
+
+Минимальный рекомендуемый запрос в чат GigaCode:
+
+```text
+Используй Agent Runtime и сценарий <имя-сценария>.
+
+Задача: <что необходимо сделать>.
+
+Сначала покажи план выполнения, затем запусти сценарий, дождись завершения и
+покажи итоговый результат.
+```
+
+Например, проверенный запрос для пользовательского сценария:
+
+```text
+Используй Agent Runtime и сценарий openspec-teach-runtime.
+
+В существующем сервисе хотим добавить массовый импорт профилей. Пока есть
+только идея: исследование кодовой базы не проводилось, change.md, design.md и
+tasks.md ещё не создавались.
+
+Объясни текущую стадию OpenSpec, рекомендуй один следующий Skill и перечисли
+необходимые входные данные. Сначала покажи план, затем запусти сценарий,
+дождись завершения и покажи итоговый JSON. Файлы не изменяй.
+```
+
+GigaCode должен сопоставить текст задачи с объявленными `inputs` сценария,
+вызвать `plan_scenario`, показать план, выполнить `start_run`, дождаться
+terminal status и получить `get_run_result`. Обычный пользователь не должен
+указывать `run_id`, `plan_hash` или `idempotency_key` заранее.
+
+Если сценарий имеет несколько входов, их удобно перечислить явно:
+
+```text
+Используй Agent Runtime и сценарий service-review.
+
+Входные данные:
+- service: profile-service
+- requirement: добавить массовый импорт профилей из CSV
+- strict_mode: true
+
+Сначала покажи план, затем запусти сценарий и дождись результата.
+```
+
+Если пользователь не знает имя сценария:
+
+```text
+Используй Agent Runtime. Покажи доступные сценарии с их назначением и
+обязательными входами. Ничего пока не запускай.
+```
+
+После выбора:
+
+```text
+Используй Agent Runtime. Опиши и проверь сценарий <имя-сценария>. Покажи его
+агентов, модели, Skills, permissions, шаги и обязательные inputs. Ничего пока
+не запускай.
+```
+
+### Как выбираются агент и модель
+
+Модель нельзя надёжно переопределить фразой в пользовательском запросе.
+Фактический model ID фиксируется у alias агента внутри YAML-сценария:
+
+```yaml
+agents:
+  analyst:
+    agent_ref: gigacode:business-analyst-proactive
+    model: vllm/Qwen3.6-35B-262k
+    permissions: propose_only
+```
+
+Запрос `запусти этот сценарий под DeepSeek` не заменит Qwen из примера.
+Для другой модели отредактируйте сценарий в Studio или создайте отдельный
+сценарий. Preview покажет новую модель и новый `plan_hash` до запуска.
+
+Один reusable agent можно использовать под разными моделями в разных Runtime
+aliases или сценариях:
+
+```yaml
+agents:
+  analyst_qwen:
+    agent_ref: gigacode:business-analyst-proactive
+    model: vllm/Qwen3.6-35B-262k
+    permissions: propose_only
+
+  analyst_deepseek:
+    agent_ref: gigacode:business-analyst-proactive
+    model: vllm/DeepSeek-V4-Flash-0731-262k
+    permissions: propose_only
+```
+
+Runtime запустит эти aliases как отдельные процессы GigaCode CLI с разными
+`--model`. Если Runtime-агент сам создаёт нативного субагента через `Agent` или
+`Task`, вложенный субагент использует модель родительского процесса; отдельную
+модель ему Runtime не назначает. Если задача должна выполняться другой моделью,
+оформите её отдельным Runtime agent step.
+
+Модель можно проверить до запуска в результате `plan_scenario`, а после
+запуска — в событии `step.started` из `get_run_events`:
+
+```text
+Покажи agents, models, permissions, skill_refs и waves плана. После завершения
+покажи model и skill_refs каждого события step.started.
+```
+
+### Техническая последовательность MCP-вызовов
+
 Обычная автоматизация использует последовательность:
 
 1. при необходимости `list_agent_profiles` или `describe_agent_profile`, чтобы
@@ -1272,8 +1680,8 @@ task: Составить чек-лист безопасной офлайн-ус�
 
 Сначала выполни validate_scenario и plan_scenario с inputs_yaml.
 Покажи waves, модели, permissions, workspace и plan_hash.
-Если план валиден, вызови start_run с тем же inputs_yaml. Не проси меня
-придумывать idempotency_key и не переходи к Shell при ошибке MCP.
+Если план валиден, вызови start_run с тем же inputs_yaml. Не переходи к Shell
+при ошибке MCP.
 Опрашивай get_run_status до конечного состояния, затем вызови
 get_run_events, get_run_result и open_dashboard.
 ```

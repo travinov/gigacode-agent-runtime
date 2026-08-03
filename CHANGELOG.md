@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0-rc.19] - 2026-08-03
+
+### Documentation
+
+- Add a practical Runtime Studio guide for JSON values, comma-separated and
+  line-separated lists, input defaults, prompt context, conditions, Runtime
+  expressions, and result mappings.
+- Add a step-by-step JSON Schema guide with typed fields, required and optional
+  values, arrays, nested objects, enums, nullable values, retry policy, and
+  common validation errors.
+- Add copyable GigaCode prompts for discovering, describing, planning, running,
+  and monitoring named Runtime scenarios without exposing internal
+  idempotency details to ordinary users.
+- Explain that execution models are fixed by Runtime scenario aliases, how one
+  reusable agent can run under different models, and how nested native
+  subagents inherit the parent process model.
+
 ## [1.0.0-rc.18] - 2026-08-03
 
 ### Added
