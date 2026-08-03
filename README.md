@@ -164,13 +164,18 @@ gigacode mcp list
 Готовый корпоративный профиль уже использует точные ID:
 
 - `vllm/Qwen3.6-35B-262k`;
-- `vllm/DeepSeek-V4-Flash-262k`;
+- `vllm/DeepSeek-V4-Flash-0731-262k`;
 - `vllm/MiniMax-M3-161k`;
 - `GigaChat-3.1-Ultra-128k`.
 
 Наличие ID в этом списке не гарантирует доступ в любой корпоративной установке.
 Сверьте их с `/model`. Для текущего acceptance ручное копирование и
 редактирование YAML не требуется, если все четыре ID доступны.
+
+При обновлении с более ранней RC установщик атомарно заменяет только прежний
+точный ID `vllm/DeepSeek-V4-Flash-262k` в существующих `config.yaml` и
+`corporate-*.yaml`. Остальное пользовательское содержимое сохраняется; при
+ошибке установки миграция откатывается вместе с версией runtime.
 
 ### Шаг 6. Проверить автоматически установленные файлы
 
@@ -216,7 +221,7 @@ gigacode:
   executable: auto
   model_allowlist:
     - vllm/Qwen3.6-35B-262k
-    - vllm/DeepSeek-V4-Flash-262k
+    - vllm/DeepSeek-V4-Flash-0731-262k
     - vllm/MiniMax-M3-161k
     - GigaChat-3.1-Ultra-128k
   environment_allowlist:
@@ -476,7 +481,7 @@ agents:
       Не изменяй файлы рабочего каталога.
 
   reviewer:
-    model: vllm/DeepSeek-V4-Flash-262k
+    model: vllm/DeepSeek-V4-Flash-0731-262k
     permissions: read_only
     system_prompt: |
       Ты независимый reviewer.
@@ -700,7 +705,7 @@ runtime и не расходует контекст модели на схемы
 ```yaml
 agents:
   reviewer:
-    model: vllm/DeepSeek-V4-Flash-262k
+    model: vllm/DeepSeek-V4-Flash-0731-262k
     permissions: read_only
     system_prompt_file: prompts/reviewer.md
 ```
@@ -1124,7 +1129,7 @@ agents:
       Всегда возвращай структурированный JSON.
 
   reviewer:
-    model: vllm/DeepSeek-V4-Flash-262k
+    model: vllm/DeepSeek-V4-Flash-0731-262k
     permissions: read_only
     system_prompt: |
       Проверяй candidate независимо.

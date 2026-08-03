@@ -45,8 +45,47 @@ def test_invalid_stream_json_is_rejected() -> None:
     assert captured.value.code is ErrorCode.STEP_OUTPUT_INVALID
 
 
+def test_stream_parser_classifies_success_envelope_api_error() -> None:
+    parser = StreamJsonParser()
+    parser.feed(
+        '{"type":"result","subtype":"success","is_error":false,'
+        '"result":"[API Error: 404 Model not found]"}\n'
+    )
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        parser.finish()
+
+    assert captured.value.code is ErrorCode.PROCESS_ERROR
+    assert captured.value.message == "GigaCode API model was not found"
+    assert captured.value.details == {"line": 1, "status_code": 404}
+    assert captured.value.retryable is False
+
+
+def test_stream_parser_marks_transient_api_error_retryable() -> None:
+    parser = StreamJsonParser()
+    parser.feed(
+        '{"type":"result","subtype":"success","is_error":false,'
+        '"result":"[API Error: 503 Service unavailable]"}\n'
+    )
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        parser.finish()
+
+    assert captured.value.code is ErrorCode.PROCESS_ERROR
+    assert captured.value.details["status_code"] == 503
+    assert captured.value.retryable is True
+
+
 def test_json_result_envelope_is_normalized() -> None:
     assert parse_json_result('{"result":{"summary":"ok"}}') == {"summary": "ok"}
+
+
+def test_json_result_classifies_api_error() -> None:
+    with pytest.raises(AgentRuntimeError) as captured:
+        parse_json_result('{"result":"[API Error: 404 Model not found]"}')
+
+    assert captured.value.code is ErrorCode.PROCESS_ERROR
+    assert captured.value.details == {"status_code": 404}
 
 
 def test_json_result_accepts_fenced_string() -> None:

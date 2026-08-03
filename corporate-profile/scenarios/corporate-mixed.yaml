@@ -22,7 +22,7 @@ agents:
       Разложи задачу на конкретные вопросы. Верни только JSON по output_schema.
 
   implementation_specialist:
-    model: vllm/DeepSeek-V4-Flash-262k
+    model: vllm/DeepSeek-V4-Flash-0731-262k
     permissions: read_only
     system_prompt: |
       Ответь с точки зрения реализации. Верни только JSON по output_schema.

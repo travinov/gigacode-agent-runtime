@@ -11,6 +11,12 @@ from typing import cast
 
 from ..errors import AgentRuntimeError, ErrorCode
 
+_API_ERROR_PATTERN = re.compile(
+    r"\A\[API Error:\s*(?:(?P<status>\d{3})\s+)?(?P<message>[\s\S]*?)\]\Z",
+    flags=re.IGNORECASE,
+)
+_RETRYABLE_API_STATUS_CODES = {408, 409, 425, 429}
+
 
 @dataclass(frozen=True, slots=True)
 class ParsedStream:
@@ -30,6 +36,35 @@ def _invalid_output(message: str, *, line: int | None = None) -> AgentRuntimeErr
     )
 
 
+def _api_error(payload: str, *, line: int | None = None) -> AgentRuntimeError | None:
+    matched = _API_ERROR_PATTERN.fullmatch(payload)
+    if matched is None:
+        return None
+    status_text = matched.group("status")
+    status_code = int(status_text) if status_text is not None else None
+    api_message = matched.group("message").strip().casefold()
+    model_not_found = status_code == 404 and "model not found" in api_message
+    details: dict[str, object] = {}
+    if line is not None:
+        details["line"] = line
+    if status_code is not None:
+        details["status_code"] = status_code
+    retryable = bool(
+        status_code in _RETRYABLE_API_STATUS_CODES
+        or (status_code is not None and status_code >= 500)
+    )
+    return AgentRuntimeError(
+        ErrorCode.PROCESS_ERROR,
+        (
+            "GigaCode API model was not found"
+            if model_not_found
+            else "GigaCode API request failed"
+        ),
+        details=details,
+        retryable=retryable,
+    )
+
+
 def _parse_object(value: object, *, source: str, line: int | None = None) -> Mapping[str, object]:
     if isinstance(value, dict):
         return MappingProxyType(cast(dict[str, object], value))
@@ -37,6 +72,9 @@ def _parse_object(value: object, *, source: str, line: int | None = None) -> Map
         raise _invalid_output(f"{source} must contain a JSON object", line=line)
 
     payload = value.strip()
+    api_error = _api_error(payload, line=line)
+    if api_error is not None:
+        raise api_error
     if payload.startswith("```") or payload.endswith("```"):
         fenced = re.fullmatch(
             r"```(?:json)?[ \t]*\r?\n(?P<payload>[\s\S]*?)\r?\n```",
@@ -49,6 +87,9 @@ def _parse_object(value: object, *, source: str, line: int | None = None) -> Map
                 line=line,
             )
         payload = fenced.group("payload").strip()
+        api_error = _api_error(payload, line=line)
+        if api_error is not None:
+            raise api_error
     try:
         parsed = json.loads(payload)
     except json.JSONDecodeError as exc:

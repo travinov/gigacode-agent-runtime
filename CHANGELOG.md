@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.0-rc.15] - 2026-08-03
+
+### Fixed
+
+- Update the ready corporate profile to the deployed
+  `vllm/DeepSeek-V4-Flash-0731-262k` model ID.
+- Migrate the exact previous DeepSeek ID in existing corporate config and
+  scenarios during upgrade, preserving other content and rolling back on an
+  installation failure.
+- Classify GigaCode success envelopes containing `[API Error: ...]` as typed
+  process failures instead of misleading structured-output validation errors.
+- Mark `404 Model not found` as non-retryable and include the requested model
+  ID in the persisted error details.
+
 ## [1.0.0-rc.14] - 2026-08-03
 
 ### Added

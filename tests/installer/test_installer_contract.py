@@ -187,6 +187,61 @@ def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
     assert "preserved existing GigaCode command" in completed.stdout
 
 
+def test_install_migrates_deployed_model_id_without_replacing_profile(
+    tmp_path: Path,
+) -> None:
+    release, fake_python, fake_gigacode = synthetic_release(tmp_path)
+    environment = installer_environment(tmp_path, fake_python, fake_gigacode)
+    data_dir = Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
+    config = data_dir / "config.yaml"
+    scenario = data_dir / "scenarios" / "corporate-sequential.yaml"
+    config.parent.mkdir(parents=True)
+    scenario.parent.mkdir(parents=True)
+    old_model = "vllm/DeepSeek-V4-Flash-262k"
+    new_model = "vllm/DeepSeek-V4-Flash-0731-262k"
+    config.write_text(f"custom: keep\nmodel: {old_model}\n")
+    scenario.write_text(f"custom: keep\nmodel: {old_model}\n")
+
+    completed = subprocess.run(
+        ["sh", str(release / "installer" / "install-macos.sh")],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert config.read_text() == f"custom: keep\nmodel: {new_model}\n"
+    assert scenario.read_text() == f"custom: keep\nmodel: {new_model}\n"
+    assert completed.stdout.count("migrated corporate model ID in:") == 2
+    assert not list(data_dir.glob(".install-profile-backup.*"))
+
+
+def test_failed_install_restores_model_id_migration(tmp_path: Path) -> None:
+    release, fake_python, fake_gigacode = synthetic_release(tmp_path)
+    environment = installer_environment(tmp_path, fake_python, fake_gigacode)
+    environment["GAR_FAIL_AFTER"] = "seed"
+    data_dir = Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
+    config = data_dir / "config.yaml"
+    scenario = data_dir / "scenarios" / "corporate-sequential.yaml"
+    config.parent.mkdir(parents=True)
+    scenario.parent.mkdir(parents=True)
+    original = "custom: keep\nmodel: vllm/DeepSeek-V4-Flash-262k\n"
+    config.write_text(original)
+    scenario.write_text(original)
+
+    completed = subprocess.run(
+        ["sh", str(release / "installer" / "install-macos.sh")],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+
+    assert completed.returncode != 0
+    assert config.read_text() == original
+    assert scenario.read_text() == original
+    assert not list(data_dir.glob(".install-profile-backup.*"))
+
+
 def test_install_seeds_simple_skills_scenario_when_dependencies_exist(
     tmp_path: Path,
 ) -> None:

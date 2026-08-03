@@ -51,7 +51,7 @@ def test_corporate_profile_is_ready_to_plan_without_edits(
     scenarios = sorted((profile / "scenarios").glob("*.yaml"))
     allowed_models = {
         "vllm/Qwen3.6-35B-262k",
-        "vllm/DeepSeek-V4-Flash-262k",
+        "vllm/DeepSeek-V4-Flash-0731-262k",
         "vllm/MiniMax-M3-161k",
         "GigaChat-3.1-Ultra-128k",
     }

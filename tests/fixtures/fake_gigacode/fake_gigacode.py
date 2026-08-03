@@ -139,6 +139,7 @@ def _emit_result(
         if result_override is not None
         else profile.get("result", {"summary": "fake success"})
     )
+    raw_result = profile.get("raw_result")
     if output_format == "stream-json":
         print(
             json.dumps(
@@ -154,9 +155,13 @@ def _emit_result(
                     "subtype": "success",
                     "is_error": False,
                     "result": (
-                        "\n\n```json\n"
-                        + json.dumps(result, separators=(",", ":"))
-                        + "\n```"
+                        raw_result
+                        if raw_result is not None
+                        else (
+                            "\n\n```json\n"
+                            + json.dumps(result, separators=(",", ":"))
+                            + "\n```"
+                        )
                     ),
                 },
                 separators=(",", ":"),
@@ -164,7 +169,13 @@ def _emit_result(
             flush=True,
         )
     elif output_format == "json":
-        print(json.dumps({"result": result}, separators=(",", ":")), flush=True)
+        print(
+            json.dumps(
+                {"result": raw_result if raw_result is not None else result},
+                separators=(",", ":"),
+            ),
+            flush=True,
+        )
     else:
         print(json.dumps(result, separators=(",", ":")), flush=True)
 

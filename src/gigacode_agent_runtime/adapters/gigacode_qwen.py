@@ -345,6 +345,15 @@ class GigaCodeQwenAdapter:
                 output = parse_json_result(process.stdout)
             self._validate_output(output, request.output_schema)
         except AgentRuntimeError as error:
+            if error.code is ErrorCode.PROCESS_ERROR:
+                details = dict(error.details)
+                details.setdefault("model", request.model)
+                error = AgentRuntimeError(
+                    error.code,
+                    error.message,
+                    details=details,
+                    retryable=error.retryable,
+                )
             raise self._captured_error(
                 error,
                 process=process,

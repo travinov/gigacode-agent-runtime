@@ -257,6 +257,25 @@ async def test_invalid_json_is_never_returned_as_agent_output(tmp_path: Path) ->
 
 
 @pytest.mark.anyio
+async def test_success_envelope_api_error_names_unavailable_model(tmp_path: Path) -> None:
+    adapter = _adapter(tmp_path, "api-model-not-found")
+
+    with pytest.raises(AgentRuntimeError) as captured:
+        await adapter.run_agent(_request(tmp_path), timeout_seconds=2)
+
+    assert captured.value.code is ErrorCode.PROCESS_ERROR
+    assert captured.value.message == "GigaCode API model was not found"
+    assert captured.value.details == {
+        "line": 2,
+        "status_code": 404,
+        "model": "code-model-id",
+    }
+    assert captured.value.retryable is False
+    assert isinstance(captured.value, AgentExecutionError)
+    assert "[API Error: 404 Model not found]" in captured.value.stdout
+
+
+@pytest.mark.anyio
 async def test_schema_validation_error_retains_corporate_stream_capture(
     tmp_path: Path,
 ) -> None:

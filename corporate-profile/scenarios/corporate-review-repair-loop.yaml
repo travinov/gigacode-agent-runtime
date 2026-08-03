@@ -14,7 +14,7 @@ inputs:
 
 agents:
   reviewer:
-    model: vllm/DeepSeek-V4-Flash-262k
+    model: vllm/DeepSeek-V4-Flash-0731-262k
     permissions: read_only
     system_prompt: |
       Проверь текущую итерацию задачи. Верни approved и конкретный feedback.

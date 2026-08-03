@@ -12,6 +12,64 @@ ROLLBACK_TARGET=""
 GIGACODE=""
 VERSION_DIR=""
 SEED_ROLLBACK_FILE=""
+PROFILE_MIGRATION_BACKUP=""
+
+restore_profile_migrations() {
+  if [ -z "$PROFILE_MIGRATION_BACKUP" ] || \
+    [ ! -d "$PROFILE_MIGRATION_BACKUP" ]; then
+    return 0
+  fi
+  find "$PROFILE_MIGRATION_BACKUP" -type f -print | while IFS= read -r BACKUP; do
+    RELATIVE_PATH=${BACKUP#"$PROFILE_MIGRATION_BACKUP/"}
+    TARGET="$GAR_DATA_DIR/$RELATIVE_PATH"
+    gar_assert_safe_under "$TARGET" "$GAR_DATA_DIR"
+    mkdir -p "$(dirname "$TARGET")"
+    /bin/cp -p "$BACKUP" "$TARGET"
+  done
+  gar_remove_tree "$PROFILE_MIGRATION_BACKUP" "$GAR_DATA_DIR"
+}
+
+discard_profile_migration_backup() {
+  if [ -n "$PROFILE_MIGRATION_BACKUP" ] && \
+    [ -d "$PROFILE_MIGRATION_BACKUP" ]; then
+    gar_remove_tree "$PROFILE_MIGRATION_BACKUP" "$GAR_DATA_DIR"
+  fi
+}
+
+migrate_model_id_file() {
+  TARGET=$1
+  OLD_MODEL=$2
+  NEW_MODEL=$3
+  if [ -L "$TARGET" ]; then
+    echo "preserved symlinked profile file without migration: $TARGET"
+    return 0
+  fi
+  [ -f "$TARGET" ] || return 0
+  grep -F "$OLD_MODEL" "$TARGET" >/dev/null 2>&1 || return 0
+  gar_assert_safe_under "$TARGET" "$GAR_DATA_DIR"
+  RELATIVE_PATH=${TARGET#"$GAR_DATA_DIR/"}
+  BACKUP="$PROFILE_MIGRATION_BACKUP/$RELATIVE_PATH"
+  mkdir -p "$(dirname "$BACKUP")"
+  /bin/cp -p "$TARGET" "$BACKUP"
+  TEMP_TARGET="${TARGET}.tmp.$$"
+  /bin/rm -f "$TEMP_TARGET"
+  sed "s|$OLD_MODEL|$NEW_MODEL|g" "$TARGET" > "$TEMP_TARGET"
+  TARGET_MODE=$(/usr/bin/stat -f '%Lp' "$TARGET")
+  chmod "$TARGET_MODE" "$TEMP_TARGET"
+  /bin/mv -f "$TEMP_TARGET" "$TARGET"
+  echo "migrated corporate model ID in: $TARGET"
+}
+
+migrate_deployed_model_id() {
+  OLD_MODEL="vllm/DeepSeek-V4-Flash-262k"
+  NEW_MODEL="vllm/DeepSeek-V4-Flash-0731-262k"
+  PROFILE_MIGRATION_BACKUP="$GAR_DATA_DIR/.install-profile-backup.$$"
+  mkdir -p "$PROFILE_MIGRATION_BACKUP"
+  migrate_model_id_file "$GAR_DATA_DIR/config.yaml" "$OLD_MODEL" "$NEW_MODEL"
+  for TARGET_SCENARIO in "$GAR_DATA_DIR/scenarios/"corporate-*.yaml; do
+    migrate_model_id_file "$TARGET_SCENARIO" "$OLD_MODEL" "$NEW_MODEL"
+  done
+}
 
 rollback_failed_install() {
   if [ -n "$SEED_ROLLBACK_FILE" ] && [ -f "$SEED_ROLLBACK_FILE" ]; then
@@ -29,6 +87,7 @@ rollback_failed_install() {
     done < "$SEED_ROLLBACK_FILE"
     /bin/rm -f "$SEED_ROLLBACK_FILE"
   fi
+  restore_profile_migrations
   if [ "$ROLLBACK_REQUIRED" -eq 1 ]; then
     if [ -n "$ROLLBACK_TARGET" ]; then
       gar_switch_current "$ROLLBACK_TARGET" || true
@@ -215,6 +274,7 @@ gar_switch_current "$VERSION_TARGET"
 gar_install_launcher
 gar_fail_after activate
 
+migrate_deployed_model_id
 seed_corporate_profile
 gar_fail_after seed
 
@@ -227,6 +287,7 @@ gar_fail_after verify
 if [ -n "$ROLLBACK_TARGET" ] && [ "$ROLLBACK_TARGET" != "$VERSION_TARGET" ]; then
   printf '%s\n' "$ROLLBACK_TARGET" > "$GAR_PREVIOUS_FILE"
 fi
+discard_profile_migration_backup
 ROLLBACK_REQUIRED=0
 /bin/rm -f "$SEED_ROLLBACK_FILE"
 SEED_ROLLBACK_FILE=""
