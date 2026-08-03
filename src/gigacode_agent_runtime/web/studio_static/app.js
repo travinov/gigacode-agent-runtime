@@ -8,8 +8,10 @@ const state = {
   original: null,
   isNew: false,
   preview: null,
+  helpTopic: "overview",
 };
 
+const HELP = window.STUDIO_HELP || { fields: {}, topics: [] };
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -29,6 +31,95 @@ function toast(message, error = false) {
   node.className = `toast visible${error ? " error" : ""}`;
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => { node.className = "toast"; }, 4200);
+}
+
+const EXACT_FIELD_HELP = {
+  "cfg-data-dir": "config.data_dir",
+  "cfg-max-parallel": "config.max_parallel_agents",
+  "cfg-timeout": "config.default_step_timeout_seconds",
+  "cfg-cancel": "config.graceful_cancel_seconds",
+  "cfg-stdout": "config.max_stdout_bytes_per_step",
+  "cfg-stderr": "config.max_stderr_bytes_per_step",
+  "cfg-executable": "config.executable",
+  "cfg-models": "config.model_allowlist",
+  "cfg-environment": "config.environment_allowlist",
+  "cfg-permission": "config.permission_default",
+  "cfg-full-parallel": "config.max_parallel_full_access_agents",
+  "cfg-full-loop": "config.max_full_access_loop_iterations",
+  "cfg-allow-full": "config.allow_full_access",
+  "cfg-confirm-full": "config.require_full_access_confirmation",
+  "cfg-web-enabled": "config.web_enabled",
+  "cfg-web-host": "config.web_host",
+  "cfg-web-port": "config.web_port",
+  "cfg-web-open": "config.web_open_automatically",
+  "agent-name": "agent.name",
+  "agent-description": "agent.description",
+  "agent-model": "agent.model",
+  "agent-approval": "agent.approval_mode",
+  "agent-color": "agent.color",
+  "agent-tools": "agent.tools",
+  "agent-disallowed": "agent.disallowed_tools",
+  "agent-prompt": "agent.system_prompt",
+  "skill-name": "skill.name",
+  "skill-description": "skill.description",
+  "skill-priority": "skill.priority",
+  "skill-paths": "skill.paths",
+  "skill-user": "skill.user_invocable",
+  "skill-model-disabled": "skill.disable_model_invocation",
+  "skill-instructions": "skill.instructions",
+  "route-name": "scenario.name",
+  "route-title": "scenario.title",
+  "route-description": "scenario.description",
+  "route-scope": "scenario.scope",
+  "route-max-parallel": "scenario.max_parallel_agents",
+  "route-result": "scenario.result",
+};
+
+function fieldHelpKey(id) {
+  if (EXACT_FIELD_HELP[id]) return EXACT_FIELD_HELP[id];
+  if (/^input-name-\d+$/.test(id)) return "scenario.input.name";
+  if (/^input-type-\d+$/.test(id)) return "scenario.input.type";
+  if (/^input-default-\d+$/.test(id)) return "scenario.input.default";
+  if (/^input-required-\d+$/.test(id)) return "scenario.input.required";
+  if (/^input-description-\d+$/.test(id)) return "scenario.input.description";
+  if (/^route-agent-name-\d+$/.test(id)) return "scenario.agent.alias";
+  if (/^route-agent-ref-\d+$/.test(id)) return "scenario.agent.ref";
+  if (/^route-agent-model-\d+$/.test(id)) return "scenario.agent.model";
+  if (/^route-agent-permission-\d+$/.test(id)) return "scenario.agent.permissions";
+  if (/^route-agent-tools-\d+$/.test(id)) return "scenario.agent.allowed_tools";
+  if (/^route-agent-skills-\d+$/.test(id)) return "scenario.agent.skill_refs";
+  if (/^route-agent-prompt-file-\d+$/.test(id)) return "scenario.agent.system_prompt_file";
+  if (/^route-agent-prompt-\d+$/.test(id)) return "scenario.agent.system_prompt";
+  if (/^route-step-\d+-kind$/.test(id)) return "scenario.step.kind";
+  if (/^route-step-\d+-iterations$/.test(id)) return "scenario.loop.max_iterations";
+  if (/^route-step-\d+-limit$/.test(id)) return "scenario.loop.on_limit";
+  if (/^route-step-\d+-until-ref$/.test(id)) return "scenario.loop.until_ref";
+  if (/^route-step-\d+-until-op$/.test(id)) return "scenario.loop.until_op";
+  if (/^route-step-\d+-until-value$/.test(id)) return "scenario.loop.until_value";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-name$/.test(id)) return "scenario.step.name";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-agent$/.test(id)) return "scenario.step.agent";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-needs$/.test(id)) return "scenario.step.needs";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-timeout$/.test(id)) return "scenario.step.timeout_seconds";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-prompt$/.test(id)) return "scenario.step.prompt";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-schema$/.test(id)) return "scenario.step.output_schema";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-when-ref$/.test(id)) return "scenario.condition.ref";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-when-op$/.test(id)) return "scenario.condition.op";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-when-value$/.test(id)) return "scenario.condition.value";
+  return null;
+}
+
+function helpButton(helpKey, label) {
+  if (!helpKey || !HELP.fields[helpKey]) return "";
+  return `<button type="button" class="field-help-trigger" data-help-key="${escapeHtml(helpKey)}" aria-label="Подсказка: ${escapeHtml(label)}" aria-controls="field-help-popover" aria-expanded="false" title="Открыть подсказку">?</button>`;
+}
+
+function fieldLabel(label, id, helpKey = fieldHelpKey(id)) {
+  return `<span class="field-label"><label for="${escapeHtml(id)}">${escapeHtml(label)}</label>${helpButton(helpKey, label)}</span>`;
+}
+
+function checkField(label, id, checked, options = {}) {
+  const disabled = options.disabled ? " disabled" : "";
+  return `<div class="check-field"><input id="${id}" type="checkbox"${checked ? " checked" : ""}${disabled}><label for="${id}">${escapeHtml(label)}</label>${helpButton(options.help || fieldHelpKey(id), label)}</div>`;
 }
 
 async function api(path, options = {}) {
@@ -54,16 +145,48 @@ async function api(path, options = {}) {
   return payload.data;
 }
 
+function hideFieldHelp() {
+  const popover = $("#field-help-popover");
+  popover.hidden = true;
+  $$(".field-help-trigger[aria-expanded='true']").forEach((node) => node.setAttribute("aria-expanded", "false"));
+}
+
+function showFieldHelp(trigger) {
+  const entry = HELP.fields[trigger.dataset.helpKey];
+  if (!entry) return;
+  const popover = $("#field-help-popover");
+  const values = helpCatalogValues(entry);
+  const catalog = values.length
+    ? `<div class="field-help-row"><strong>Текущий каталог</strong><span>${values.slice(0, 12).map(escapeHtml).join(" · ")}${values.length > 12 ? ` · ещё ${values.length - 12}` : ""}</span></div>`
+    : "";
+  popover.innerHTML = `<div class="field-help-heading"><strong>${escapeHtml(entry.title)}</strong><button type="button" class="field-help-close" aria-label="Закрыть">×</button></div><p>${escapeHtml(entry.description)}</p><div class="field-help-row"><strong>Допустимо</strong><span>${escapeHtml(entry.allowed)}</span></div><div class="field-help-row"><strong>Пример</strong><code>${escapeHtml(entry.example)}</code></div>${catalog}<button type="button" class="field-help-details" data-help-topic="${escapeHtml(entry.topic)}">Открыть подробное описание</button>`;
+  hideFieldHelp();
+  popover.hidden = false;
+  trigger.setAttribute("aria-expanded", "true");
+  const triggerBox = trigger.getBoundingClientRect();
+  const popoverBox = popover.getBoundingClientRect();
+  const left = Math.min(window.innerWidth - popoverBox.width - 14, Math.max(14, triggerBox.left));
+  const below = triggerBox.bottom + 8;
+  const top = below + popoverBox.height <= window.innerHeight - 14
+    ? below
+    : Math.max(14, triggerBox.top - popoverBox.height - 8);
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+}
+
 function field(label, id, value, options = {}) {
   const type = options.type || "text";
   const wide = options.wide ? "field-wide" : "field";
   const hint = options.hint ? `<small>${escapeHtml(options.hint)}</small>` : "";
   const disabled = options.disabled ? " disabled" : "";
   const min = options.min !== undefined ? ` min="${options.min}"` : "";
+  const max = options.max !== undefined ? ` max="${options.max}"` : "";
+  const step = options.step !== undefined ? ` step="${options.step}"` : "";
+  const labelNode = fieldLabel(label, id, options.help || fieldHelpKey(id));
   if (type === "textarea") {
-    return `<div class="${wide}"><label for="${id}">${escapeHtml(label)}</label><textarea id="${id}"${disabled}>${escapeHtml(value)}</textarea>${hint}</div>`;
+    return `<div class="${wide}">${labelNode}<textarea id="${id}"${disabled}>${escapeHtml(value)}</textarea>${hint}</div>`;
   }
-  return `<div class="${wide}"><label for="${id}">${escapeHtml(label)}</label><input id="${id}" type="${type}" value="${escapeHtml(value)}"${min}${disabled}>${hint}</div>`;
+  return `<div class="${wide}">${labelNode}<input id="${id}" type="${type}" value="${escapeHtml(value)}"${min}${max}${step}${disabled}>${hint}</div>`;
 }
 
 function selectField(label, id, value, choices, options = {}) {
@@ -73,7 +196,7 @@ function selectField(label, id, value, choices, options = {}) {
     const item = typeof choice === "string" ? { value: choice, label: choice } : choice;
     return `<option value="${escapeHtml(item.value)}"${item.value === value ? " selected" : ""}>${escapeHtml(item.label)}</option>`;
   }).join("");
-  return `<div class="${wide}"><label for="${id}">${escapeHtml(label)}</label><select id="${id}"${disabled}>${entries}</select></div>`;
+  return `<div class="${wide}">${fieldLabel(label, id, options.help || fieldHelpKey(id))}<select id="${id}"${disabled}>${entries}</select></div>`;
 }
 
 function section(title, description, body, action = "") {
@@ -94,6 +217,15 @@ function markClean() {
 
 function currentItems() {
   if (!state.catalog) return [];
+  if (state.kind === "help") {
+    return HELP.topics.map((topic) => ({
+      name: topic.id,
+      title: topic.title,
+      description: topic.description,
+      source_level: "offline",
+      writable: false,
+    }));
+  }
   if (state.kind === "config") {
     return [{ name: "runtime-config", description: "Эффективные настройки", source_level: "selected", writable: true }];
   }
@@ -106,7 +238,69 @@ const KIND_COPY = {
   scenario: { title: "Маршруты", singular: "Маршрут", icon: "R" },
   agent: { title: "Агенты", singular: "Агент", icon: "A" },
   skill: { title: "Скиллы", singular: "Skill", icon: "S" },
+  help: { title: "Описание", singular: "Справка Studio", icon: "?" },
 };
+
+function helpTopic(topicId) {
+  return HELP.topics.find((topic) => topic.id === topicId) || HELP.topics[0];
+}
+
+function helpCatalogValues(entry) {
+  if (!entry.catalog || !state.catalog) return [];
+  if (entry.catalog === "agents") return state.catalog.agents.map((item) => item.agent_ref);
+  if (entry.catalog === "skills") return state.catalog.skills.map((item) => item.skill_ref);
+  return state.catalog.choices[entry.catalog] || [];
+}
+
+function renderFieldReference(keys) {
+  return `<div class="help-field-table">${keys.map((key) => {
+    const entry = HELP.fields[key];
+    if (!entry) return "";
+    const values = helpCatalogValues(entry);
+    const catalog = values.length
+      ? `<div><strong>Текущий каталог</strong><span>${values.map(escapeHtml).join(" · ")}</span></div>`
+      : "";
+    return `<article id="help-field-${escapeHtml(key.replaceAll(".", "-"))}"><h4>${escapeHtml(entry.title)}</h4><p>${escapeHtml(entry.description)}</p><div><strong>Допустимо</strong><span>${escapeHtml(entry.allowed)}</span></div><div><strong>Пример</strong><code>${escapeHtml(entry.example)}</code></div>${catalog}</article>`;
+  }).join("")}</div>`;
+}
+
+function renderHelpSection(section) {
+  const paragraphs = (section.paragraphs || []).map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("");
+  const bullets = section.bullets?.length
+    ? `<ul>${section.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    : "";
+  const table = section.table
+    ? `<div class="help-table-wrap"><table><thead><tr>${section.table.headers.map((cell) => `<th>${escapeHtml(cell)}</th>`).join("")}</tr></thead><tbody>${section.table.rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`
+    : "";
+  const code = section.code ? `<pre class="help-code">${escapeHtml(section.code)}</pre>` : "";
+  return `<section class="help-section"><h3>${escapeHtml(section.title)}</h3>${paragraphs}${bullets}${table}${code}</section>`;
+}
+
+function renderHelpTopic(topic) {
+  const steps = topic.steps?.length
+    ? `<ol class="help-steps">${topic.steps.map(([title, text], index) => `<li><span>${index + 1}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div></li>`).join("")}</ol>`
+    : "";
+  const sections = (topic.sections || []).map(renderHelpSection).join("");
+  const fieldGroups = (topic.fieldGroups || []).map(([title, keys]) => `<section class="help-section"><h3>${escapeHtml(title)}: поля и значения</h3>${renderFieldReference(keys)}</section>`).join("");
+  return `<article class="help-document"><div class="help-hero"><span class="eyebrow">Встроенная офлайн-справка</span><h3>${escapeHtml(topic.title)}</h3><p>${escapeHtml(topic.description)}</p></div>${steps}${sections}${fieldGroups}</article>`;
+}
+
+function selectHelpTopic(topicId) {
+  const topic = helpTopic(topicId);
+  if (!topic) return;
+  state.kind = "help";
+  state.helpTopic = topic.id;
+  $("#connection-state").hidden = true;
+  $("#editor-shell").hidden = false;
+  $("#editor-actions").hidden = true;
+  $("#resource-kind").textContent = "HELP";
+  $("#resource-scope").textContent = "offline";
+  $("#resource-title").textContent = topic.title;
+  $("#resource-path").textContent = "Встроенная справка · schema v1 · без внешних ссылок";
+  $("#editor-content").innerHTML = renderHelpTopic(topic);
+  $("#activation-copy").textContent = "Нажмите ? рядом с полем для короткой подсказки или выберите тему в разделе «Описание».";
+  renderCatalog();
+}
 
 function renderCatalog() {
   const query = $("#catalog-search").value.trim().toLowerCase();
@@ -115,20 +309,24 @@ function renderCatalog() {
     return haystack.includes(query);
   });
   $("#catalog-title").textContent = KIND_COPY[state.kind].title;
-  $("#new-resource").hidden = state.kind === "config";
-  const activeName = state.current?.name || (state.kind === "config" ? "runtime-config" : null);
+  $("#new-resource").hidden = state.kind === "config" || state.kind === "help";
+  const activeName = state.kind === "help"
+    ? state.helpTopic
+    : state.current?.name || (state.kind === "config" ? "runtime-config" : null);
   $("#catalog-list").innerHTML = items.length ? items.map((item) => {
     const scope = item.source_level || "user";
     const label = item.title || item.name;
     const description = item.description || scope;
     const active = item.name === activeName && (state.kind !== "scenario" || scope === state.current?.scope);
-    return `<button class="catalog-item${active ? " active" : ""}" data-name="${escapeHtml(item.name)}" data-scope="${escapeHtml(scope)}"><span class="catalog-icon">${KIND_COPY[state.kind].icon}</span><span class="catalog-copy"><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small></span>${item.writable === false ? '<span class="readonly-chip">READ ONLY</span>' : ""}</button>`;
+    const readonly = item.writable === false && state.kind !== "help" ? '<span class="readonly-chip">READ ONLY</span>' : "";
+    return `<button class="catalog-item${active ? " active" : ""}" data-name="${escapeHtml(item.name)}" data-scope="${escapeHtml(scope)}"><span class="catalog-icon">${KIND_COPY[state.kind].icon}</span><span class="catalog-copy"><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small></span>${readonly}</button>`;
   }).join("") : '<div class="empty-state">Ничего не найдено</div>';
 
   const roots = state.catalog.paths;
-  const root = state.kind === "config" ? state.catalog.config.source_path
-    : state.kind === "scenario" ? (roots.project_scenarios || roots.user_scenarios)
-      : roots[`${state.kind}s`];
+  const root = state.kind === "help" ? "Встроенная офлайн-справка"
+    : state.kind === "config" ? state.catalog.config.source_path
+      : state.kind === "scenario" ? (roots.project_scenarios || roots.user_scenarios)
+        : roots[`${state.kind}s`];
   $("#managed-root").textContent = root || "—";
 }
 
@@ -201,6 +399,7 @@ function newResource() {
 
 function renderHeader() {
   const current = state.current;
+  $("#editor-actions").hidden = false;
   const title = state.kind === "config" ? "Настройки Runtime"
     : current.document?.metadata?.title || current.document?.name || current.name;
   $("#resource-kind").textContent = state.kind.toUpperCase();
@@ -218,13 +417,13 @@ function renderConfig(document) {
   const gigacode = document.gigacode;
   const permissions = document.permissions;
   const web = document.web;
-  const hashes = Object.entries(permissions.trusted_scenario_hashes || {}).map(([name, hash], index) => `<div class="repeat-card trust-row" data-index="${index}"><div class="field-grid"><div class="field"><label>Сценарий</label><input data-field="name" value="${escapeHtml(name)}"></div><div class="field"><label>SHA-256</label><input data-field="hash" value="${escapeHtml(hash)}"></div></div><button class="remove-button remove-repeat" data-group="trust" type="button">Удалить</button></div>`).join("");
+  const hashes = Object.entries(permissions.trusted_scenario_hashes || {}).map(([name, hash], index) => `<div class="repeat-card trust-row" data-index="${index}"><div class="field-grid"><div class="field">${fieldLabel("Сценарий", `trust-name-${index}`, "config.trusted_scenario_name")}<input id="trust-name-${index}" data-field="name" value="${escapeHtml(name)}"></div><div class="field">${fieldLabel("SHA-256", `trust-hash-${index}`, "config.trusted_scenario_hash")}<input id="trust-hash-${index}" data-field="hash" value="${escapeHtml(hash)}"></div></div><button class="remove-button remove-repeat" data-group="trust" type="button">Удалить</button></div>`).join("");
   return [
-    section("Runtime", "Лимиты параллельности, ожидания и выходных потоков", `<div class="field-grid three">${field("Data directory", "cfg-data-dir", runtime.data_dir, { wide: true, hint: "Абсолютный путь или путь внутри домашнего каталога" })}${field("Параллельных агентов", "cfg-max-parallel", runtime.max_parallel_agents, { type: "number", min: 1 })}${field("Timeout шага, сек.", "cfg-timeout", runtime.default_step_timeout_seconds, { type: "number", min: 1 })}${field("Graceful cancel, сек.", "cfg-cancel", runtime.graceful_cancel_seconds, { type: "number", min: 0 })}${field("Max stdout, байт", "cfg-stdout", runtime.max_stdout_bytes_per_step, { type: "number", min: 1 })}${field("Max stderr, байт", "cfg-stderr", runtime.max_stderr_bytes_per_step, { type: "number", min: 1 })}</div>`),
+    section("Runtime", "Лимиты параллельности, ожидания и выходных потоков", `<div class="field-grid three">${field("Data directory", "cfg-data-dir", runtime.data_dir, { wide: true, hint: "Абсолютный путь или путь внутри домашнего каталога" })}${field("Параллельных агентов", "cfg-max-parallel", runtime.max_parallel_agents, { type: "number", min: 1 })}${field("Timeout шага, сек.", "cfg-timeout", runtime.default_step_timeout_seconds, { type: "number", min: 1 })}${field("Graceful cancel, сек.", "cfg-cancel", runtime.graceful_cancel_seconds, { type: "number", min: 1 })}${field("Max stdout, байт", "cfg-stdout", runtime.max_stdout_bytes_per_step, { type: "number", min: 1024 })}${field("Max stderr, байт", "cfg-stderr", runtime.max_stderr_bytes_per_step, { type: "number", min: 1024 })}</div>`),
     section("GigaCode CLI", "Исполняемый файл, разрешённые модели и имена переменных окружения", `<div class="field-grid">${field("Executable", "cfg-executable", gigacode.executable, { wide: true })}${field("Model allowlist", "cfg-models", gigacode.model_allowlist.join("\n"), { type: "textarea", hint: "Одна модель на строку" })}${field("Environment allowlist", "cfg-environment", gigacode.environment_allowlist.join("\n"), { type: "textarea", hint: "Только имена; значения Studio не отображает" })}</div>`),
-    section("Права", "Политика песочницы и защищённого full access", `<div class="field-grid three">${selectField("По умолчанию", "cfg-permission", permissions.default, state.catalog.choices.permissions)}${field("Full access одновременно", "cfg-full-parallel", permissions.max_parallel_full_access_agents, { type: "number", min: 1 })}${field("Итераций full access loop", "cfg-full-loop", permissions.max_full_access_loop_iterations, { type: "number", min: 1 })}<label class="check-field"><input id="cfg-allow-full" type="checkbox"${permissions.allow_full_access ? " checked" : ""}>Разрешить full access</label><label class="check-field"><input id="cfg-confirm-full" type="checkbox"${permissions.require_full_access_confirmation ? " checked" : ""}>Требовать подтверждение</label></div>`),
+    section("Права", "Политика песочницы и защищённого full access", `<div class="field-grid three">${selectField("По умолчанию", "cfg-permission", permissions.default, state.catalog.choices.permissions)}${field("Full access одновременно", "cfg-full-parallel", permissions.max_parallel_full_access_agents, { type: "number", min: 1 })}${field("Итераций full access loop", "cfg-full-loop", permissions.max_full_access_loop_iterations, { type: "number", min: 1 })}${checkField("Разрешить full access", "cfg-allow-full", permissions.allow_full_access)}${checkField("Требовать подтверждение", "cfg-confirm-full", permissions.require_full_access_confirmation)}</div>`),
     section("Trusted scenario hashes", "Точные доверенные планы", `<div id="trust-list" class="repeat-list">${hashes}</div><button class="add-button" id="add-trust" type="button">+ Добавить доверенный хеш</button>`),
-    section("Web UI", "Локальный сервер Dashboard и Studio", `<div class="field-grid three"><label class="check-field"><input id="cfg-web-enabled" type="checkbox"${web.enabled ? " checked" : ""}>Web UI включён</label>${field("Host", "cfg-web-host", web.host, { disabled: true })}${field("Port", "cfg-web-port", web.port, { hint: "auto или 1–65535" })}<label class="check-field"><input id="cfg-web-open" type="checkbox"${web.open_automatically ? " checked" : ""}>Открывать автоматически</label></div>`),
+    section("Web UI", "Локальный сервер Dashboard и Studio", `<div class="field-grid three">${checkField("Web UI включён", "cfg-web-enabled", web.enabled)}${field("Host", "cfg-web-host", web.host, { disabled: true })}${field("Port", "cfg-web-port", web.port, { hint: "auto или 1024–65535" })}${checkField("Открывать автоматически", "cfg-web-open", web.open_automatically, { disabled: true })}</div>`),
   ].join("");
 }
 
@@ -240,7 +439,7 @@ function renderSkill(document, writable) {
   } else if (state.current.override_from) {
     banner = `<div class="override-banner">User Skill перекроет источник: ${escapeHtml(state.current.override_from)}</div>`;
   }
-  return banner + section("GigaCode Skill", "Инструкции и invocation metadata без ручного front matter", `<div class="field-grid">${field("Имя", "skill-name", document.name, { disabled: !state.isNew })}${field("Описание", "skill-description", document.description || "")}${field("Priority", "skill-priority", document.priority ?? "", { type: "number" })}${field("Paths", "skill-paths", (document.paths || []).join("\n"), { type: "textarea", hint: "Один glob на строку" })}<label class="check-field"><input id="skill-user" type="checkbox"${document["user-invocable"] === false ? "" : " checked"}>User invocable</label><label class="check-field"><input id="skill-model-disabled" type="checkbox"${document["disable-model-invocation"] ? " checked" : ""}>Запретить model invocation</label>${field("Инструкции Skill", "skill-instructions", document.instructions || "", { type: "textarea", wide: true, hint: "Тело SKILL.md; front matter сформирует Studio" })}</div>`);
+  return banner + section("GigaCode Skill", "Инструкции и invocation metadata без ручного front matter", `<div class="field-grid">${field("Имя", "skill-name", document.name, { disabled: !state.isNew })}${field("Описание", "skill-description", document.description || "")}${field("Priority", "skill-priority", document.priority ?? "", { type: "number", step: "any" })}${field("Paths", "skill-paths", (document.paths || []).join("\n"), { type: "textarea", hint: "Один glob на строку" })}${checkField("User invocable", "skill-user", document["user-invocable"] !== false)}${checkField("Запретить model invocation", "skill-model-disabled", document["disable-model-invocation"])}${field("Инструкции Skill", "skill-instructions", document.instructions || "", { type: "textarea", wide: true, hint: "Тело SKILL.md; front matter сформирует Studio" })}</div>`);
 }
 
 function selectedOptions(values, choices) {
@@ -249,12 +448,12 @@ function selectedOptions(values, choices) {
 }
 
 function renderInputCard(name, input, index) {
-  return `<div class="repeat-card input-card" data-name="${escapeHtml(name)}"><div class="repeat-card-header"><span class="repeat-number">I${index + 1}</span><strong>${escapeHtml(name)}</strong><button type="button" class="remove-button remove-repeat" data-group="input" data-name="${escapeHtml(name)}">Удалить</button></div><div class="field-grid three">${field("Ключ", `input-name-${index}`, name)}${selectField("Тип", `input-type-${index}`, input.type || "string", ["string", "integer", "number", "boolean", "object", "array"])}${field("Default (JSON или строка)", `input-default-${index}`, input.default === undefined ? "" : JSON.stringify(input.default))}<label class="check-field"><input id="input-required-${index}" type="checkbox"${input.required ? " checked" : ""}>Обязательный</label>${field("Описание", `input-description-${index}`, input.description || "", { wide: true })}</div></div>`;
+  return `<div class="repeat-card input-card" data-name="${escapeHtml(name)}"><div class="repeat-card-header"><span class="repeat-number">I${index + 1}</span><strong>${escapeHtml(name)}</strong><button type="button" class="remove-button remove-repeat" data-group="input" data-name="${escapeHtml(name)}">Удалить</button></div><div class="field-grid three">${field("Ключ", `input-name-${index}`, name)}${selectField("Тип", `input-type-${index}`, input.type || "string", ["string", "integer", "number", "boolean", "object", "array"])}${field("Default (JSON или строка)", `input-default-${index}`, input.default === undefined ? "" : JSON.stringify(input.default))}${checkField("Обязательный", `input-required-${index}`, input.required)}${field("Описание", `input-description-${index}`, input.description || "", { wide: true })}</div></div>`;
 }
 
 function renderAgentCard(name, agent, index) {
   const refs = [{ value: "", label: "Inline system prompt" }, ...state.catalog.agents.map((item) => ({ value: item.agent_ref, label: `${item.name} · ${item.model || "model from route"}` }))];
-  return `<div class="repeat-card route-agent-card" data-name="${escapeHtml(name)}"><div class="repeat-card-header"><span class="repeat-number">A${index + 1}</span><strong>${escapeHtml(name)}</strong><button type="button" class="remove-button remove-repeat" data-group="agent" data-name="${escapeHtml(name)}">Удалить</button></div><div class="field-grid three">${field("Alias", `route-agent-name-${index}`, name)}${selectField("Reusable agent", `route-agent-ref-${index}`, agent.agent_ref || "", refs)}${selectField("Model", `route-agent-model-${index}`, agent.model || "", state.catalog.choices.models.length ? state.catalog.choices.models : [agent.model || "REPLACE_WITH_MODEL_ID"])}${selectField("Permissions", `route-agent-permission-${index}`, agent.permissions || "read_only", state.catalog.choices.permissions)}${field("Allowed tools", `route-agent-tools-${index}`, (agent.allowed_tools || []).join(", "), { hint: "Через запятую" })}<div class="field"><label for="route-agent-skills-${index}">Skills</label><select id="route-agent-skills-${index}" multiple>${selectedOptions(agent.skill_refs, state.catalog.skills)}</select><small>Cmd/Ctrl — несколько значений</small></div>${field("System prompt file", `route-agent-prompt-file-${index}`, agent.system_prompt_file || "", { wide: true, hint: "Используется, если reusable agent не выбран" })}${field("System prompt (для inline)", `route-agent-prompt-${index}`, agent.system_prompt || "", { type: "textarea", wide: true, hint: "Оставьте пустым при использовании prompt file" })}</div></div>`;
+  return `<div class="repeat-card route-agent-card" data-name="${escapeHtml(name)}"><div class="repeat-card-header"><span class="repeat-number">A${index + 1}</span><strong>${escapeHtml(name)}</strong><button type="button" class="remove-button remove-repeat" data-group="agent" data-name="${escapeHtml(name)}">Удалить</button></div><div class="field-grid three">${field("Alias", `route-agent-name-${index}`, name)}${selectField("Reusable agent", `route-agent-ref-${index}`, agent.agent_ref || "", refs)}${selectField("Model", `route-agent-model-${index}`, agent.model || "", state.catalog.choices.models.length ? state.catalog.choices.models : [agent.model || "REPLACE_WITH_MODEL_ID"])}${selectField("Permissions", `route-agent-permission-${index}`, agent.permissions || "read_only", state.catalog.choices.permissions)}${field("Allowed tools", `route-agent-tools-${index}`, (agent.allowed_tools || []).join(", "), { hint: "Через запятую" })}<div class="field">${fieldLabel("Skills", `route-agent-skills-${index}`)}<select id="route-agent-skills-${index}" multiple>${selectedOptions(agent.skill_refs, state.catalog.skills)}</select><small>Cmd/Ctrl — несколько значений</small></div>${field("System prompt file", `route-agent-prompt-file-${index}`, agent.system_prompt_file || "", { wide: true, hint: "Используется, если reusable agent не выбран" })}${field("System prompt (для inline)", `route-agent-prompt-${index}`, agent.system_prompt || "", { type: "textarea", wide: true, hint: "Оставьте пустым при использовании prompt file" })}</div></div>`;
 }
 
 function conditionFields(prefix, condition = {}) {
@@ -267,7 +466,7 @@ function conditionFields(prefix, condition = {}) {
 
 function renderAgentStepFields(step, prefix, agentNames) {
   const schema = JSON.stringify(step.output_schema || { type: "object" }, null, 2);
-  return `<div class="field-grid three">${selectField("Agent", `${prefix}-agent`, step.agent || agentNames[0] || "", agentNames)}${field("Needs", `${prefix}-needs`, (step.needs || []).join(", "), { hint: "ID шагов через запятую" })}${field("Timeout, сек.", `${prefix}-timeout`, step.timeout_seconds || "", { type: "number" })}${field("Prompt template", `${prefix}-prompt`, step.prompt?.template || "", { type: "textarea", wide: true })}${field("Output schema (JSON)", `${prefix}-schema`, schema, { type: "textarea", wide: true })}</div><div class="nested-body"><h4>Необязательное условие when</h4>${conditionFields(prefix, step.when || {})}</div>`;
+  return `<div class="field-grid three">${selectField("Agent", `${prefix}-agent`, step.agent || agentNames[0] || "", agentNames)}${field("Needs", `${prefix}-needs`, (step.needs || []).join(", "), { hint: "ID шагов через запятую" })}${field("Timeout, сек.", `${prefix}-timeout`, step.timeout_seconds || "", { type: "number", min: 1 })}${field("Prompt template", `${prefix}-prompt`, step.prompt?.template || "", { type: "textarea", wide: true })}${field("Output schema (JSON)", `${prefix}-schema`, schema, { type: "textarea", wide: true })}</div><div class="nested-body"><h4>Необязательное условие when</h4>${conditionFields(prefix, step.when || {})}</div>`;
 }
 
 function renderNestedStep(name, step, index, parent, agentNames) {
@@ -280,7 +479,7 @@ function renderStepCard(name, step, index, agentNames) {
   let body;
   if (step.kind === "loop") {
     const nested = Object.entries(step.body?.steps || {}).map(([nestedName, nestedStep], nestedIndex) => renderNestedStep(nestedName, nestedStep, nestedIndex, name, agentNames)).join("");
-    body = `<div class="field-grid three">${field("Needs", `${prefix}-needs`, (step.needs || []).join(", "))}${field("Max iterations", `${prefix}-iterations`, step.max_iterations || 1, { type: "number", min: 1 })}${field("Timeout, сек.", `${prefix}-timeout`, step.timeout_seconds || 900, { type: "number", min: 1 })}${selectField("On limit", `${prefix}-limit`, step.on_limit || "fail", ["fail", "pause"])}${field("Until ref", `${prefix}-until-ref`, step.until?.ref || "${loop.steps.work.output.approved}")}${selectField("Until op", `${prefix}-until-op`, step.until?.op || "eq", ["eq", "ne", "lt", "lte", "gt", "gte", "contains", "exists"])}${field("Until value (JSON)", `${prefix}-until-value`, JSON.stringify(step.until?.value ?? true))}</div><div class="nested-body"><h4>Шаги одной итерации</h4><div class="repeat-list nested-list">${nested}</div><button type="button" class="add-button add-nested" data-parent="${escapeHtml(name)}">+ Добавить шаг в loop</button></div>`;
+    body = `<div class="field-grid three">${field("Needs", `${prefix}-needs`, (step.needs || []).join(", "))}${field("Max iterations", `${prefix}-iterations`, step.max_iterations || 1, { type: "number", min: 1 })}${field("Timeout, сек.", `${prefix}-timeout`, step.timeout_seconds || 900, { type: "number", min: 1 })}${selectField("On limit", `${prefix}-limit`, step.on_limit || "fail", ["fail", "pause", "best_effort"])}${field("Until ref", `${prefix}-until-ref`, step.until?.ref || "${loop.steps.work.output.approved}")}${selectField("Until op", `${prefix}-until-op`, step.until?.op || "eq", ["eq", "ne", "lt", "lte", "gt", "gte", "contains", "exists"])}${field("Until value (JSON)", `${prefix}-until-value`, JSON.stringify(step.until?.value ?? true))}</div><div class="nested-body"><h4>Шаги одной итерации</h4><div class="repeat-list nested-list">${nested}</div><button type="button" class="add-button add-nested" data-parent="${escapeHtml(name)}">+ Добавить шаг в loop</button></div>`;
   } else {
     body = renderAgentStepFields(step, prefix, agentNames);
   }
@@ -644,9 +843,14 @@ async function applyPreview() {
 }
 
 function switchKind(kind) {
+  hideFieldHelp();
   state.kind = kind;
   $$(".nav-item").forEach((node) => node.classList.toggle("active", node.dataset.kind === kind));
   $("#catalog-search").value = "";
+  if (kind === "help") {
+    selectHelpTopic(state.helpTopic);
+    return;
+  }
   renderCatalog();
   const items = currentItems();
   if (kind === "config") selectResource("config", "selected").catch(showFatal);
@@ -660,6 +864,31 @@ function showFatal(error) {
 }
 
 function bindEvents() {
+  document.addEventListener("click", (event) => {
+    const trigger = event.target.closest?.(".field-help-trigger");
+    if (trigger) {
+      const alreadyOpen = trigger.getAttribute("aria-expanded") === "true";
+      if (alreadyOpen) hideFieldHelp();
+      else showFieldHelp(trigger);
+      return;
+    }
+    if (event.target.closest?.(".field-help-close")) {
+      hideFieldHelp();
+      return;
+    }
+    const details = event.target.closest?.(".field-help-details");
+    if (details) {
+      state.helpTopic = details.dataset.helpTopic;
+      switchKind("help");
+      return;
+    }
+    if (!event.target.closest?.("#field-help-popover")) hideFieldHelp();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hideFieldHelp();
+  });
+  window.addEventListener("resize", hideFieldHelp);
+  window.addEventListener("scroll", hideFieldHelp, true);
   document.addEventListener("input", (event) => {
     if (event.target.closest("#editor-content")) markDirty();
   });
@@ -676,6 +905,10 @@ function bindEvents() {
   $("#catalog-list").addEventListener("click", (event) => {
     const item = event.target.closest(".catalog-item");
     if (!item) return;
+    if (state.kind === "help") {
+      selectHelpTopic(item.dataset.name);
+      return;
+    }
     const name = state.kind === "config" ? null : item.dataset.name;
     selectResource(state.kind, item.dataset.scope, name).catch(showFatal);
   });

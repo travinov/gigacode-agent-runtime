@@ -70,6 +70,19 @@ def _agent_draft(name: str = "reviewer") -> dict[str, object]:
 
 
 @pytest.mark.anyio
+async def test_studio_serves_packaged_help_asset(tmp_path: Path) -> None:
+    _config, _service, _auth, client = _studio_fixture(tmp_path)
+    try:
+        response = await client.get("/assets/help.js")
+    finally:
+        await client.aclose()
+
+    assert response.status_code == 200
+    assert "javascript" in response.headers["content-type"]
+    assert "window.STUDIO_HELP" in response.text
+
+
+@pytest.mark.anyio
 async def test_studio_auth_is_separate_from_dashboard(tmp_path: Path) -> None:
     config, _service, studio_auth, studio_client = _studio_fixture(tmp_path)
     dashboard_auth = DashboardAuth()

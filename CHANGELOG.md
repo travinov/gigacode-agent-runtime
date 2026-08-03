@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.0-rc.17] - 2026-08-03
+
+### Added
+
+- Add accessible `?` popovers to every managed Studio field with purpose,
+  accepted values, examples, and live catalog values where applicable.
+- Add a dedicated offline `Описание` section with step-by-step guides for
+  Runtime settings, agents, Skills, scenarios, DAG execution, loops,
+  permissions, Preview, Apply, and activation.
+
+### Fixed
+
+- Align Studio input constraints with the production schemas and expose the
+  supported `best_effort` loop limit policy.
+
 ## [1.0.0-rc.16] - 2026-08-03
 
 ### Fixed

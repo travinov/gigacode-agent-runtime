@@ -49,12 +49,18 @@ agent-runtime studio --workspace "$PWD" --open
 ```
 
 MCP tool `open_studio` только создаёт authenticated URL и сам по себе не меняет
-файлы. Studio содержит четыре справочника:
+файлы. Studio содержит пять разделов:
 
 - effective runtime settings;
 - user/project/built-in routes;
 - reusable agents из `~/.gigacode/agents`;
-- user/extension/bundled Skills с видимым active source и overrides.
+- user/extension/bundled Skills с видимым active source и overrides;
+- встроенное офлайн-описание со справкой по полям, допустимым значениям,
+  созданию ресурсов, DAG, loops, permissions и безопасному сохранению.
+
+Каждое управляемое поле имеет кнопку `?`. Всплывающая подсказка показывает
+назначение, допустимые значения, пример и, где применимо, текущие model, agent,
+Skill, permission или approval-mode значения из каталога Studio.
 
 Маршрут собирается структурированно: inputs, agents, model/permission/Skill
 справочники, `needs`, prompts, output schemas, agent steps, loop body, `until` и

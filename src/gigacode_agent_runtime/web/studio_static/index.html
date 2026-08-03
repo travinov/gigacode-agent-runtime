@@ -21,6 +21,7 @@
           <button class="nav-item" data-kind="scenario">Маршруты</button>
           <button class="nav-item" data-kind="agent">Агенты</button>
           <button class="nav-item" data-kind="skill">Скиллы</button>
+          <button class="nav-item" data-kind="help">Описание</button>
         </nav>
         <div class="local-badge"><span></span> Только localhost</div>
       </header>
@@ -58,7 +59,7 @@
               <h2 id="resource-title">Настройки Runtime</h2>
               <p id="resource-path" class="resource-path"></p>
             </div>
-            <div class="editor-actions">
+            <div id="editor-actions" class="editor-actions">
               <span id="dirty-state" class="dirty-state">Нет изменений</span>
               <button id="reload-resource" class="button secondary">Сбросить</button>
               <button id="preview-resource" class="button primary">Проверить и сохранить</button>
@@ -117,7 +118,9 @@
       </form>
     </dialog>
 
+    <div id="field-help-popover" class="field-help-popover" role="dialog" aria-label="Подсказка поля" hidden></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/assets/help.js" defer></script>
     <script src="/assets/app.js" defer></script>
   </body>
 </html>

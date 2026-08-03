@@ -26,7 +26,7 @@ from .auth import (
 from .server import SecurityHeadersMiddleware, _error_response
 
 _MAX_REQUEST_BYTES = 2 * 1024 * 1024 + 16 * 1024
-_ASSETS = {"app.js", "styles.css", "icons.svg"}
+_ASSETS = {"app.js", "help.js", "styles.css", "icons.svg"}
 
 
 def _asset_path(name: str) -> Path:
