@@ -48,8 +48,13 @@ project wheel, поэтому release candidate можно безопасно о
 На чистой установке installer также размещает `config.yaml`, шесть сценариев
 `corporate-*` в `~/.gigacode/agent-runtime/`, пример переиспользуемого агента
 `~/.gigacode/agents/business-analyst-proactive.md` и безопасный Skill
-`~/.gigacode/skills/runtime-skill-probe/SKILL.md`. Существующие файлы с теми же
-именами сохраняются без изменений.
+`~/.gigacode/skills/runtime-skill-probe/SKILL.md`. Он также регистрирует
+custom command `~/.gigacode/commands/open_studio.md`, доступную в GigaCode как
+`/open_studio`. Существующие файлы с теми же именами сохраняются без изменений.
+
+Если runtime обнаруживает уже установленные `doc-review` и `secure-coding`, он
+также размещает `corporate-simple-skills.yaml`. При отсутствии любого из них
+пример пропускается и базовая установка остаётся работоспособной.
 
 После установки:
 
@@ -58,7 +63,14 @@ agent-runtime diagnose --json
 agent-runtime scenarios list --json
 agent-runtime agents list --json
 agent-runtime skills list --json
+test -f "$HOME/.gigacode/commands/open_studio.md"
 gigacode mcp list
+```
+
+На корпоративной машине с `doc-review` и `secure-coding` дополнительно:
+
+```bash
+test -f "$HOME/.gigacode/agent-runtime/scenarios/corporate-simple-skills.yaml"
 ```
 
 Пути установки и точный registration result выводятся installer. Пользовательские
@@ -75,3 +87,7 @@ Rollback переключает `current` на предыдущую полнос
 Uninstaller удаляет регистрацию MCP и файлы программы, но по умолчанию
 сохраняет `~/.gigacode/agent-runtime/`. Удаляйте data directory отдельно только
 после резервного копирования нужных runs и artifacts.
+
+Installer хранит checksum созданной им `/open_studio`. При uninstall команда
+удаляется только если её содержимое осталось неизменным; пользовательская
+правка или заранее существовавшая команда сохраняется.

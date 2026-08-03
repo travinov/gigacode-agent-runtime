@@ -27,6 +27,10 @@ subagent calls.
   `corporate-mixed`, `corporate-review-repair-loop`, `corporate-agent-ref`, or
   `corporate-skill-ref`
   scenario for corporate acceptance. They already contain approved model IDs.
+- Prefer `corporate-simple-skills` to prove per-agent Skill assignment when
+  `doc-review` and `secure-coding` are installed; it uses text-only
+  `propose_only` agents and does not require external rendering or modeling
+  tools.
 - Accept a named catalog scenario or `inline_scenario_yaml`. Provide exactly
   one. Pass an inline scenario as YAML text beginning with `schema_version`,
   never as JSON text.

@@ -74,6 +74,50 @@ def test_corporate_profile_is_ready_to_plan_without_edits(
         assert {agent.model for agent in plan.agents.values()} <= allowed_models
 
 
+def test_optional_simple_skills_scenario_is_ready_for_installed_text_skills(
+    tmp_path: Path,
+) -> None:
+    profile = ROOT / "corporate-profile"
+    skills = tmp_path / "home" / ".gigacode" / "skills"
+    for name in ("doc-review", "secure-coding"):
+        directory = skills / name
+        directory.mkdir(parents=True)
+        (directory / "SKILL.md").write_text(
+            "---\n"
+            f"name: {name}\n"
+            f"description: Simple {name} proof.\n"
+            "---\n\n"
+            f"Apply {name} only to the supplied text.\n"
+        )
+    config = load_config(profile / "config.yaml", home=tmp_path / "home")
+    scenario = load_scenario_file(
+        profile
+        / "optional-scenarios"
+        / "corporate-simple-skills.yaml",
+        skill_catalog=SkillProfileCatalog(skills),
+    )
+
+    plan = compile_plan(
+        scenario,
+        config,
+        inputs={"task": "# API\nReview this short specification."},
+        workspace=tmp_path,
+    )
+
+    assert plan.waves == (
+        ("review_documentation", "review_security"),
+        ("synthesize",),
+    )
+    assert [
+        skill.reference
+        for skill in plan.agents["documentation_reviewer"].skills
+    ] == ["gigacode:doc-review"]
+    assert [
+        skill.reference for skill in plan.agents["security_reviewer"].skills
+    ] == ["gigacode:secure-coding"]
+    assert plan.agents["synthesizer"].skills == ()
+
+
 def test_public_docs_have_no_personal_paths_or_assignment_secrets() -> None:
     combined = "\n".join(path.read_text(encoding="utf-8") for path in PUBLIC_DOCS)
 

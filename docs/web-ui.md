@@ -32,3 +32,42 @@ agent-runtime dashboard RUN_ID --open
 
 Не публикуйте dashboard через reverse proxy и не пересылайте стартовую ссылку.
 Статические assets входят в офлайн-пакет; CDN и внешние скрипты не используются.
+
+## Configuration Studio
+
+Studio запускается тем же локальным runtime, но использует отдельный порт,
+отдельную auth-сессию и cookie:
+
+```text
+/open_studio
+```
+
+или из терминала:
+
+```bash
+agent-runtime studio --workspace "$PWD" --open
+```
+
+MCP tool `open_studio` только создаёт authenticated URL и сам по себе не меняет
+файлы. Studio содержит четыре справочника:
+
+- effective runtime settings;
+- user/project/built-in routes;
+- reusable agents из `~/.gigacode/agents`;
+- user/extension/bundled Skills с видимым active source и overrides.
+
+Маршрут собирается структурированно: inputs, agents, model/permission/Skill
+справочники, `needs`, prompts, output schemas, agent steps, loop body, `until` и
+result. Built-in routes и extension/bundled Skills помечаются как read-only.
+
+Каждая запись проходит две явные стадии:
+
+1. `Preview`: production parser/schema, plan compilation, target path, текущий
+   и кандидатный SHA-256, bounded unified diff;
+2. `Apply`: одноразовый preview ID, session binding, optimistic conflict check,
+   file lock, backup, atomic write `0600`, post-write validation и rollback.
+
+Studio отклоняет traversal и symlink в управляемых путях. Она не отображает
+значения environment variables и не предназначена для ввода произвольных MCP
+секретов. Config применяется после reconnect MCP; сценарии, agents и Skills —
+для последующих catalog discovery и новых планов.

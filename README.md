@@ -124,8 +124,11 @@ MCP-сервер с именем `gigacode-agent-runtime`. На чистой у�
 - `~/.gigacode/agent-runtime/scenarios/corporate-review-repair-loop.yaml`;
 - `~/.gigacode/agent-runtime/scenarios/corporate-agent-ref.yaml`;
 - `~/.gigacode/agent-runtime/scenarios/corporate-skill-ref.yaml`;
+- `~/.gigacode/agent-runtime/scenarios/corporate-simple-skills.yaml` — если
+  уже установлены `doc-review` и `secure-coding`;
 - `~/.gigacode/agents/business-analyst-proactive.md`.
 - `~/.gigacode/skills/runtime-skill-probe/SKILL.md`.
+- `~/.gigacode/commands/open_studio.md` — команда `/open_studio`.
 
 Если файл уже существует, installer сохраняет его без изменений. Поэтому
 обновление runtime не перезаписывает пользовательскую конфигурацию или сценарий.
@@ -138,15 +141,17 @@ agent-runtime diagnose --subprocess-smoke --json
 agent-runtime scenarios list --json
 agent-runtime agents list --json
 agent-runtime skills list --json
+test -f "$HOME/.gigacode/commands/open_studio.md"
 gigacode mcp list
 ```
 
 В открытом GigaCode вызовите `/mcp`. Сервер `gigacode-agent-runtime` должен
 иметь статус «Подключен», а его инструменты не должны быть помечены как
 недействительные. В `agent-runtime scenarios list --json` должны присутствовать
-шесть сценариев `corporate-*`, `agent-runtime agents list --json` должен найти
-`business-analyst-proactive`, а `agent-runtime skills list --json` —
-`runtime-skill-probe`.
+шесть базовых сценариев `corporate-*`; при установленных `doc-review` и
+`secure-coding` должен также появиться седьмой `corporate-simple-skills`.
+`agent-runtime agents list --json` должен найти `business-analyst-proactive`,
+а `agent-runtime skills list --json` — `runtime-skill-probe`.
 
 ### Шаг 5. Проверить установленные model ID
 
@@ -174,10 +179,16 @@ test -f "$HOME/.gigacode/agent-runtime/config.yaml"
 ls "$HOME/.gigacode/agent-runtime/scenarios"/corporate-*.yaml
 test -f "$HOME/.gigacode/agents/business-analyst-proactive.md"
 test -f "$HOME/.gigacode/skills/runtime-skill-probe/SKILL.md"
+test -f "$HOME/.gigacode/commands/open_studio.md"
 ```
 
 Все команды должны завершиться успешно. Эти файлы устанавливаются прямо из
 проверенного ZIP; каталог `examples/` для первого acceptance не нужен.
+Если `doc-review` и `secure-coding` установлены, дополнительно проверьте:
+
+```bash
+test -f "$HOME/.gigacode/agent-runtime/scenarios/corporate-simple-skills.yaml"
+```
 
 ## Глобальная конфигурация runtime
 
@@ -295,7 +306,7 @@ permissions:
 | `enabled` | `true` / `false` | `true` | Включает локальный Web UI. |
 | `host` | Только `127.0.0.1` | `127.0.0.1` | Web UI v1 не публикуется в локальную сеть. |
 | `port` | `auto` или `1024..65535` | `auto` | `auto` выбирает свободный локальный порт. |
-| `open_automatically` | Только `false` | `false` | Браузер открывается только по явному `open_dashboard` или CLI `--open`. |
+| `open_automatically` | Только `false` | `false` | Браузер открывается только по явному `open_dashboard`, `open_studio` или CLI `--open`. |
 
 ## Где создавать сценарии и агентов
 
@@ -409,6 +420,26 @@ Installer кладёт безопасную проверку в готовые �
 ~/.gigacode/skills/runtime-skill-probe/SKILL.md
 ~/.gigacode/agent-runtime/scenarios/corporate-skill-ref.yaml
 ```
+
+Если в объединённом каталоге уже доступны простые текстовые Skills
+`gigacode:doc-review` и `gigacode:secure-coding`, installer дополнительно
+размещает готовый `corporate-simple-skills`. В первой wave два
+`propose_only`-агента параллельно проверяют переданный текст — каждый только со
+своим Skill. Во второй wave агент без Skills объединяет результаты. Сценарий не
+читает файлы, не вызывает инструменты и не использует Draw.io или BPMN.
+
+Проверочный запрос обычного пользователя:
+
+```text
+Используй Agent Runtime и готовый сценарий corporate-simple-skills. Проверь
+короткую спецификацию API: POST /profiles/{id} обновляет имя пользователя;
+пример кода формирует SQL через f-строку; авторизация, валидация и аудит в
+описании отсутствуют. Покажи план, запусти проверку и дождись общего итога.
+```
+
+В плане первая wave должна содержать `review_documentation` и
+`review_security`, а результат — `skills_used` ровно с `doc-review` и
+`secure-coding`.
 
 ## Готовый последовательный сценарий
 
@@ -1269,6 +1300,41 @@ timeout.
 Изменение сценария, config, inputs или workspace создаёт другой `plan_hash`;
 старое подтверждение не применяется.
 
+## Configuration Studio
+
+Локальная Runtime Studio управляет настройками, маршрутами, reusable agents и
+GigaCode Skills через справочники и структурированные формы. Откройте её из
+GigaCode точной командой:
+
+```text
+/open_studio
+```
+
+Команда устанавливается как `~/.gigacode/commands/open_studio.md` и просит
+GigaCode вызвать MCP tool `open_studio`. Прямой CLI-вариант:
+
+```bash
+agent-runtime studio --workspace "$PWD" --open
+```
+
+Studio показывает точный target path, server-side validation, скомпилированные
+waves, bounded diff и hashes до записи. `Apply` является одноразовой
+транзакцией с lock, backup, atomic replace, режимом `0600`, повторной проверкой
+и rollback. Raw YAML/front matter вводить не нужно.
+
+Управляемые места:
+
+- выбранный `~/.gigacode/agent-runtime/config.yaml`;
+- user-сценарии `~/.gigacode/agent-runtime/scenarios/*.yaml`;
+- project-сценарии `<workspace>/.gigacode/scenarios/*.yaml`;
+- agents `~/.gigacode/agents/*.md`;
+- user Skills `~/.gigacode/skills/<name>/SKILL.md`.
+
+Built-in сценарии и extension/bundled Skills доступны только для чтения.
+Созданный user Skill может явно перекрыть одноимённый extension/bundled source.
+После изменения config переподключите GigaCode/MCP; остальные сохранённые
+ресурсы доступны новым планам после обновления каталога.
+
 ## Мониторинг и продолжение запуска
 
 Открыть Web UI существующего запуска:
@@ -1295,6 +1361,7 @@ open_dashboard(run_id=RUN_ID)
 | `resume_run` | Продолжение `paused`, `interrupted` или подтверждённого запуска. |
 | `cancel_run` | Отмена и завершение process groups. |
 | `open_dashboard` | Одноразовый локальный URL Web UI. |
+| `open_studio` | Одноразовый URL локальной Configuration Studio без изменения файлов. |
 
 CLI-эквиваленты:
 
@@ -1390,7 +1457,7 @@ runs/RUN_ID/artifacts/steps/STEP/attempt-N/stderr.txt
 
 ## Готовые примеры и дополнительная документация
 
-Для корпоративной проверки installer автоматически размещает шесть готовых
+Для корпоративной проверки installer автоматически размещает шесть базовых
 сценариев с проверенными model ID:
 
 - `corporate-sequential`;
@@ -1400,7 +1467,11 @@ runs/RUN_ID/artifacts/steps/STEP/attempt-N/stderr.txt
 - `corporate-agent-ref`;
 - `corporate-skill-ref`.
 
-Их исходники находятся в `corporate-profile/scenarios/`.
+При установленных `doc-review` и `secure-coding` добавляется седьмой готовый
+`corporate-simple-skills`; его исходник находится в
+`corporate-profile/optional-scenarios/` и не зависит от Draw.io/BPMN.
+
+Исходники шести базовых сценариев находятся в `corporate-profile/scenarios/`.
 
 В репозитории также находятся пять переносимых шаблонов:
 

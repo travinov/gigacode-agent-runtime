@@ -72,6 +72,10 @@ TOOL_DESCRIPTIONS = {
     "resume_run": "Resume a paused, interrupted, or waiting agent run.",
     "cancel_run": "Cancel an agent run and terminate its active processes.",
     "open_dashboard": "Open the authenticated local monitoring dashboard URL.",
+    "open_studio": (
+        "Open the authenticated local Configuration Studio URL without changing "
+        "managed files."
+    ),
 }
 TOOL_NAMES = tuple(TOOL_DESCRIPTIONS)
 
@@ -436,6 +440,13 @@ def create_mcp_server(
         structured_output=True,
     )(
         tools.open_dashboard
+    )
+    server.tool(
+        name="open_studio",
+        description=TOOL_DESCRIPTIONS["open_studio"],
+        structured_output=True,
+    )(
+        tools.open_studio
     )
     return server
 

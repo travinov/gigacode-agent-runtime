@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0-rc.14] - 2026-08-03
+
+### Added
+
+- Add the isolated Runtime Configuration Studio, the `open_studio` MCP tool,
+  CLI entrypoint, and host-native `/open_studio` command.
+- Add the optional ready-to-run `corporate-simple-skills` proof: `doc-review`
+  and `secure-coding` execute in parallel under `propose_only`, followed by a
+  no-Skill synthesis step.
+- Seed the proof automatically only when both external text Skills are already
+  discoverable, keeping a clean community installation valid without them.
+
+### Security
+
+- Keep the simple Skills proof tool-free and file-free; it does not invoke
+  Draw.io, BPMN, shell, or external MCP tools.
+
 ## [1.0.0-rc.13] - 2026-07-31
 
 ### Added

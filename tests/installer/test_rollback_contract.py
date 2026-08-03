@@ -71,6 +71,71 @@ def test_uninstall_preserves_data_without_purge(tmp_path: Path) -> None:
     assert not install_root.exists()
 
 
+def test_uninstall_removes_unchanged_installer_owned_open_studio_command(
+    tmp_path: Path,
+) -> None:
+    release, fake_python, fake_gigacode = synthetic_release(tmp_path)
+    environment = installer_environment(tmp_path, fake_python, fake_gigacode)
+    install = subprocess.run(
+        ["sh", str(release / "installer" / "install-macos.sh")],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+    command = Path(environment["HOME"]) / ".gigacode" / "commands" / (
+        "open_studio.md"
+    )
+    marker = (
+        Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
+        / ".open-studio-command.sha256"
+    )
+    assert install.returncode == 0, install.stderr
+    assert command.is_file() and marker.is_file()
+
+    uninstall = subprocess.run(
+        ["sh", str(release / "installer" / "uninstall-macos.sh")],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+
+    assert uninstall.returncode == 0, uninstall.stderr
+    assert not command.exists()
+    assert not marker.exists()
+
+
+def test_uninstall_preserves_user_modified_open_studio_command(tmp_path: Path) -> None:
+    release, fake_python, fake_gigacode = synthetic_release(tmp_path)
+    environment = installer_environment(tmp_path, fake_python, fake_gigacode)
+    install = subprocess.run(
+        ["sh", str(release / "installer" / "install-macos.sh")],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+    command = Path(environment["HOME"]) / ".gigacode" / "commands" / (
+        "open_studio.md"
+    )
+    marker = (
+        Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
+        / ".open-studio-command.sha256"
+    )
+    assert install.returncode == 0, install.stderr
+    command.write_text("user customized command\n", encoding="utf-8")
+
+    uninstall = subprocess.run(
+        ["sh", str(release / "installer" / "uninstall-macos.sh")],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+
+    assert uninstall.returncode == 0, uninstall.stderr
+    assert command.read_text(encoding="utf-8") == "user customized command\n"
+    assert not marker.exists()
+    assert "preserved modified GigaCode command" in uninstall.stdout
+
+
 def test_purge_refuses_home_as_data_target(tmp_path: Path) -> None:
     release, fake_python, fake_gigacode = synthetic_release(tmp_path)
     environment = installer_environment(tmp_path, fake_python, fake_gigacode)

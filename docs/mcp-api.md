@@ -70,6 +70,7 @@ workspace и `idempotency_key`. Не передавайте idempotency key в
 | `approve_run` | `run_id`, `plan_hash`, `gate=full_access` | подтвердить точный план |
 | `provide_input` | `run_id`, `gate_id`, `value` | передать schema-validated input |
 | `open_dashboard` | необязательный `run_id` | получить локальную одноразовую URL |
+| `open_studio` | — | получить одноразовую URL Configuration Studio без изменения файлов |
 
 После `approve_run` или `provide_input` вызовите `resume_run`, если runtime не
 возобновил сценарий в текущем lifecycle автоматически.

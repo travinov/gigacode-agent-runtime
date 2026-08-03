@@ -12,6 +12,8 @@ SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
   gar_die "reusable GigaCode agent profile is missing"
 [ -f "$GAR_SKILLS_DIR/runtime-skill-probe/SKILL.md" ] || \
   gar_die "GigaCode Skill probe is missing"
+[ -f "$GAR_STUDIO_COMMAND" ] || \
+  gar_die "GigaCode /open_studio command is missing"
 for SCENARIO_NAME in \
   corporate-sequential \
   corporate-parallel \
@@ -28,6 +30,12 @@ GIGACODE=$(gar_find_gigacode)
 "$GAR_LAUNCHER" --version
 "$GAR_LAUNCHER" agents list --json
 "$GAR_LAUNCHER" skills list --json
+if "$GAR_LAUNCHER" skills describe doc-review --json >/dev/null 2>&1 && \
+  "$GAR_LAUNCHER" skills describe secure-coding --json >/dev/null 2>&1
+then
+  [ -f "$GAR_DATA_DIR/scenarios/corporate-simple-skills.yaml" ] || \
+    gar_die "optional simple Skills scenario is missing"
+fi
 "$GAR_LAUNCHER" diagnose --json
 gar_verify_mcp "$GIGACODE"
 echo "installation verified"

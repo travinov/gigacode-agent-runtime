@@ -46,8 +46,8 @@ gigacode mcp list
 `business-analyst-proactive`, `list_skill_profiles`, `describe_skill_profile`
 для `runtime-skill-probe`, `describe_scenario` для `corporate-sequential`, затем
 `diagnose_runtime`.
-Убедитесь, что
-доступны все 20 tools из `docs/mcp-api.md`, каждый tool имеет непустое описание,
+Убедитесь, что доступен полный набор из 21 tool из `docs/mcp-api.md`, включая
+`open_studio`, каждый tool имеет непустое описание,
 `/mcp` не показывает недействительные инструменты, `describe_scenario`
 возвращает полные поля `kind`, `needs`, `prompt` и `output_schema`, а ответы
 имеют envelope `ok/data` или `ok/error`.
@@ -73,6 +73,7 @@ test -f "$HOME/.gigacode/agent-runtime/config.yaml"
 ls "$HOME/.gigacode/agent-runtime/scenarios"/corporate-*.yaml
 test -f "$HOME/.gigacode/agents/business-analyst-proactive.md"
 test -f "$HOME/.gigacode/skills/runtime-skill-probe/SKILL.md"
+test -f "$HOME/.gigacode/commands/open_studio.md"
 agent-runtime agents list --json
 agent-runtime skills list --json
 ```
@@ -93,6 +94,8 @@ agent-runtime scenario validate \
   "$HOME/.gigacode/agent-runtime/scenarios/corporate-agent-ref.yaml" --json
 agent-runtime scenario validate \
   "$HOME/.gigacode/agent-runtime/scenarios/corporate-skill-ref.yaml" --json
+agent-runtime scenario validate \
+  "$HOME/.gigacode/agent-runtime/scenarios/corporate-simple-skills.yaml" --json
 ```
 
 В `/model` должны присутствовать:
@@ -101,6 +104,30 @@ agent-runtime scenario validate \
 - `vllm/DeepSeek-V4-Flash-262k`;
 - `vllm/MiniMax-M3-161k`;
 - `GigaChat-3.1-Ultra-128k`.
+
+### Проверить `/open_studio`
+
+Откройте новый чат GigaCode и выполните точную команду:
+
+```text
+/open_studio
+```
+
+Проверьте, что GigaCode обнаружил custom command, вызвал MCP tool
+`open_studio`, а браузер открыл URL на `127.0.0.1`. В Studio должны быть видны
+settings, шесть базовых `corporate-*` routes, условный
+`corporate-simple-skills`, `business-analyst-proactive` и фактический
+объединённый Skill catalog. Измените безвредное поле, откройте Preview,
+зафиксируйте validation/waves/diff и нажмите «Отмена», не применяя изменение.
+
+Отдельно проверьте terminal fallback:
+
+```bash
+agent-runtime studio --workspace "$PWD" --open
+```
+
+Этот gate нельзя считать пройденным по source/unit тестам: slash-command
+discovery подтверждается именно установленным корпоративным GigaCode CLI.
 
 ## 6. Sequential и parallel через MCP
 
@@ -151,6 +178,24 @@ GigaCode должен выбрать `corporate-agent-ref` или явно со�
 `tool_exclusion` и ресурс `skill:gigacode:runtime-skill-probe`. Итог обязан
 содержать `"skill_marker": "RUNTIME_SKILL_PROBE_OK"`. В Web UI строка шага
 должна показывать назначенный Skill.
+
+Затем докажите работу двух простых Skills из фактической установки, не используя
+Draw.io или BPMN:
+
+```text
+Используй Agent Runtime и готовый сценарий corporate-simple-skills. Проверь
+короткую спецификацию API: POST /profiles/{id} обновляет имя пользователя;
+пример кода формирует SQL через f-строку; авторизация, валидация и аудит в
+описании отсутствуют. Сначала покажи план, затем запусти сценарий, дождись
+завершения и покажи общий итог.
+```
+
+План обязан показать параллельную первую wave
+`review_documentation + review_security`, только `gigacode:doc-review` у
+первого агента, только `gigacode:secure-coding` у второго и отсутствие Skills у
+`synthesizer`. Итог обязан содержать `skills_used` ровно с `doc-review` и
+`secure-coding`. Все агенты работают в `propose_only`, поэтому этот тест не
+читает и не изменяет файлы.
 
 Не используйте MCP-параметр `inputs`: wire-контракт GigaCode/Qwen принимает
 значения сценария через строковый `inputs_yaml`. Не кодируйте JSON object

@@ -21,6 +21,7 @@ rollback_failed_install() {
           "$GAR_DATA_DIR"/*) gar_assert_safe_under "$SEEDED_PATH" "$GAR_DATA_DIR" ;;
           "$GAR_AGENTS_DIR"/*) gar_assert_safe_under "$SEEDED_PATH" "$GAR_AGENTS_DIR" ;;
           "$GAR_SKILLS_DIR"/*) gar_assert_safe_under "$SEEDED_PATH" "$GAR_SKILLS_DIR" ;;
+          "$GAR_COMMANDS_DIR"/*) gar_assert_safe_under "$SEEDED_PATH" "$GAR_COMMANDS_DIR" ;;
           *) gar_die "seeded path is outside managed roots: $SEEDED_PATH" ;;
         esac
         /bin/rm -f "$SEEDED_PATH"
@@ -45,6 +46,24 @@ rollback_failed_install() {
   if [ "$CREATED_VERSION" -eq 1 ] && [ -n "$VERSION_DIR" ]; then
     gar_remove_tree "$VERSION_DIR" "$GAR_INSTALL_ROOT/versions"
   fi
+}
+
+seed_owned_command_if_missing() {
+  SOURCE=$1
+  TARGET=$2
+  MARKER=$3
+  if [ -e "$TARGET" ] || [ -L "$TARGET" ]; then
+    echo "preserved existing GigaCode command: $TARGET"
+    return 0
+  fi
+  seed_file_if_missing "$SOURCE" "$TARGET"
+  COMMAND_DIGEST=$(gar_sha256_file "$TARGET")
+  TEMP_MARKER="${MARKER}.tmp.$$"
+  /bin/rm -f "$TEMP_MARKER"
+  printf '%s\n' "$COMMAND_DIGEST" > "$TEMP_MARKER"
+  chmod 600 "$TEMP_MARKER"
+  /bin/mv -f "$TEMP_MARKER" "$MARKER"
+  printf '%s\n' "$MARKER" >> "$SEED_ROLLBACK_FILE"
 }
 
 seed_file_if_missing() {
@@ -103,6 +122,22 @@ seed_corporate_profile() {
     seed_file_if_missing "$SOURCE_SKILL" "$TARGET_SKILL_DIR/SKILL.md"
   done
   [ "$SKILL_COUNT" -gt 0 ] || gar_die "corporate Skill profile is empty"
+  OPTIONAL_SIMPLE_SCENARIO="$PROFILE_ROOT/optional-scenarios/corporate-simple-skills.yaml"
+  [ -f "$OPTIONAL_SIMPLE_SCENARIO" ] || \
+    gar_die "optional simple Skills scenario is missing"
+  if "$VERSION_ENTRYPOINT" skills describe doc-review --json >/dev/null 2>&1 && \
+    "$VERSION_ENTRYPOINT" skills describe secure-coding --json >/dev/null 2>&1
+  then
+    seed_file_if_missing \
+      "$OPTIONAL_SIMPLE_SCENARIO" \
+      "$GAR_DATA_DIR/scenarios/corporate-simple-skills.yaml"
+  else
+    echo "skipped corporate-simple-skills: doc-review and secure-coding are required"
+  fi
+  seed_owned_command_if_missing \
+    "$PROFILE_ROOT/commands/open_studio.md" \
+    "$GAR_STUDIO_COMMAND" \
+    "$GAR_STUDIO_COMMAND_MARKER"
 }
 
 on_exit() {
@@ -140,6 +175,7 @@ PROJECT_DIGEST=$(
 mkdir -p "$GAR_INSTALL_ROOT/versions" "$GAR_BIN_DIR" \
   "$GAR_DATA_DIR/scenarios" "$GAR_DATA_DIR/runs" "$GAR_AGENTS_DIR" \
   "$GAR_SKILLS_DIR"
+mkdir -p "$GAR_COMMANDS_DIR"
 VERSION_TARGET="versions/$GAR_VERSION-$PROJECT_DIGEST"
 VERSION_DIR="$GAR_INSTALL_ROOT/$VERSION_TARGET"
 PREVIOUS_TARGET=$(gar_read_current)

@@ -1,4 +1,4 @@
-"""One-time bootstrap and short-lived local dashboard sessions."""
+"""One-time bootstrap and short-lived local Web UI sessions."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from ..errors import AgentRuntimeError, ErrorCode
 
 SESSION_COOKIE = "gar_session"
+STUDIO_SESSION_COOKIE = "gar_studio_session"
 
 
 def _digest(value: str) -> str:
@@ -24,11 +25,17 @@ class DashboardSession:
 
 
 class DashboardAuth:
-    def __init__(self, *, session_ttl_seconds: int = 3600) -> None:
+    def __init__(
+        self,
+        *,
+        session_ttl_seconds: int = 3600,
+        surface_name: str = "Dashboard",
+    ) -> None:
         self._bootstrap_token = secrets.token_urlsafe(32)
         self._bootstrap_digest = _digest(self._bootstrap_token)
         self._bootstrap_used = False
         self._session_ttl_seconds = session_ttl_seconds
+        self._surface_name = surface_name
         self._sessions: dict[str, DashboardSession] = {}
 
     @property
@@ -49,7 +56,7 @@ class DashboardAuth:
         ):
             raise AgentRuntimeError(
                 ErrorCode.PERMISSION_DENIED,
-                "Dashboard bootstrap token is invalid or already used",
+                f"{self._surface_name} bootstrap token is invalid or already used",
             )
         self._bootstrap_used = True
         session_token = secrets.token_urlsafe(32)
@@ -65,13 +72,13 @@ class DashboardAuth:
         if not session_token:
             raise AgentRuntimeError(
                 ErrorCode.PERMISSION_DENIED,
-                "Dashboard session is required",
+                f"{self._surface_name} session is required",
             )
         session = self._sessions.get(_digest(session_token))
         if session is None or session.expires_at <= time.time():
             raise AgentRuntimeError(
                 ErrorCode.PERMISSION_DENIED,
-                "Dashboard session is invalid or expired",
+                f"{self._surface_name} session is invalid or expired",
             )
         return session
 

@@ -17,6 +17,22 @@ if GIGACODE=$(gar_find_gigacode 2>/dev/null); then
   gar_unregister_mcp "$GIGACODE"
 fi
 
+if [ -f "$GAR_STUDIO_COMMAND_MARKER" ]; then
+  EXPECTED_COMMAND_DIGEST=$(sed -n '1p' "$GAR_STUDIO_COMMAND_MARKER")
+  if [ -f "$GAR_STUDIO_COMMAND" ] && [ ! -L "$GAR_STUDIO_COMMAND" ]; then
+    CURRENT_COMMAND_DIGEST=$(gar_sha256_file "$GAR_STUDIO_COMMAND")
+    if [ "$CURRENT_COMMAND_DIGEST" = "$EXPECTED_COMMAND_DIGEST" ]; then
+      /bin/rm -f "$GAR_STUDIO_COMMAND"
+      echo "removed installer-owned GigaCode command: $GAR_STUDIO_COMMAND"
+    else
+      echo "preserved modified GigaCode command: $GAR_STUDIO_COMMAND"
+    fi
+  elif [ -e "$GAR_STUDIO_COMMAND" ] || [ -L "$GAR_STUDIO_COMMAND" ]; then
+    echo "preserved replaced GigaCode command: $GAR_STUDIO_COMMAND"
+  fi
+  /bin/rm -f "$GAR_STUDIO_COMMAND_MARKER"
+fi
+
 if [ -L "$GAR_LAUNCHER" ]; then
   LAUNCHER_TARGET=$(readlink "$GAR_LAUNCHER")
   case "$LAUNCHER_TARGET" in

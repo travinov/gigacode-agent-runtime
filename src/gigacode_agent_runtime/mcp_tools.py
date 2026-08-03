@@ -39,6 +39,7 @@ AdapterFactory = Callable[[], AgentAdapter]
 
 if TYPE_CHECKING:
     from .web.server import LocalWebServer
+    from .web.studio_server import LocalStudioServer
 
 
 class McpToolService:
@@ -49,6 +50,7 @@ class McpToolService:
         project_scenarios: Path | None = None,
         adapter_factory: AdapterFactory | None = None,
         dashboard_url: Callable[[str | None], str] | None = None,
+        studio_url: Callable[[], str] | None = None,
     ) -> None:
         self.config = config
         self._runtime = RuntimeService(config)
@@ -66,9 +68,12 @@ class McpToolService:
         )
         self._adapter_factory = adapter_factory or self._default_adapter
         self._dashboard_url = dashboard_url
+        self._studio_url = studio_url
         self._web_server: LocalWebServer | None = None
+        self._studio_server: LocalStudioServer | None = None
         self._background_tasks: anyio.abc.TaskGroup | None = None
         self._web_start_lock = anyio.Lock()
+        self._studio_start_lock = anyio.Lock()
 
     def _default_adapter(self) -> AgentAdapter:
         return create_gigacode_adapter(self.config)
@@ -93,6 +98,9 @@ class McpToolService:
         traceback: TracebackType | None,
     ) -> None:
         if self._started:
+            if self._studio_server is not None:
+                await self._studio_server.stop()
+                self._studio_server = None
             if self._web_server is not None:
                 await self._web_server.stop()
                 self._web_server = None
@@ -153,6 +161,38 @@ class McpToolService:
                 self._web_server = web_server
         assert self._web_server is not None
         return self._web_server.url(run_id)
+
+    async def _ensure_studio(self) -> str:
+        if self._studio_url is not None:
+            return self._studio_url()
+        if not self.config.web.enabled:
+            raise AgentRuntimeError(
+                ErrorCode.CAPABILITY_UNAVAILABLE,
+                "Local Studio is disabled in runtime configuration",
+            )
+        async with self._studio_start_lock:
+            if self._studio_server is None:
+                from .studio import StudioService
+                from .web.studio_server import LocalStudioServer
+
+                background_tasks = self._background_tasks
+                if background_tasks is None:
+                    raise AgentRuntimeError(
+                        ErrorCode.INVALID_STATE_TRANSITION,
+                        "MCP runtime lifecycle has not started",
+                    )
+                studio_server = LocalStudioServer(
+                    StudioService(
+                        self.config,
+                        project_scenarios=self._project_scenarios,
+                    ),
+                    host=self.config.web.host,
+                    port=None,
+                )
+                await studio_server.start(task_group=background_tasks)
+                self._studio_server = studio_server
+        assert self._studio_server is not None
+        return self._studio_server.url()
 
     def _scenario(
         self,
@@ -597,5 +637,14 @@ class McpToolService:
         async def operation() -> dict[str, object]:
             self._require_started()
             return {"url": await self._ensure_dashboard(run_id)}
+
+        return await public_result(operation)
+
+    async def open_studio(self) -> dict[str, object]:
+        """Return an authenticated URL without changing any managed file."""
+
+        async def operation() -> dict[str, object]:
+            self._require_started()
+            return {"url": await self._ensure_studio()}
 
         return await public_result(operation)

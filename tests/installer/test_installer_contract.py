@@ -82,6 +82,9 @@ def test_failure_injection_rolls_back_every_stage(
     assert not (agents_dir / "business-analyst-proactive.md").exists()
     skills_dir = Path(environment["HOME"]) / ".gigacode" / "skills"
     assert not (skills_dir / "runtime-skill-probe" / "SKILL.md").exists()
+    commands_dir = Path(environment["HOME"]) / ".gigacode" / "commands"
+    assert not (commands_dir / "open_studio.md").exists()
+    assert not (data_dir / ".open-studio-command.sha256").exists()
 
 
 def test_install_keeps_venv_at_created_path_and_is_idempotent(
@@ -124,6 +127,13 @@ def test_install_keeps_venv_at_created_path_and_is_idempotent(
     assert (agents_dir / "business-analyst-proactive.md").is_file()
     skills_dir = Path(environment["HOME"]) / ".gigacode" / "skills"
     assert (skills_dir / "runtime-skill-probe" / "SKILL.md").is_file()
+    command = Path(environment["HOME"]) / ".gigacode" / "commands" / (
+        "open_studio.md"
+    )
+    assert command.read_text() == (
+        ROOT / "corporate-profile" / "commands" / "open_studio.md"
+    ).read_text()
+    assert (data_dir / ".open-studio-command.sha256").is_file()
 
 
 def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
@@ -142,14 +152,22 @@ def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
         / "runtime-skill-probe"
         / "SKILL.md"
     )
+    command = (
+        Path(environment["HOME"])
+        / ".gigacode"
+        / "commands"
+        / "open_studio.md"
+    )
     config.parent.mkdir(parents=True)
     scenario.parent.mkdir(parents=True)
     agent.parent.mkdir(parents=True)
     skill.parent.mkdir(parents=True)
+    command.parent.mkdir(parents=True)
     config.write_text("existing config\n")
     scenario.write_text("existing scenario\n")
     agent.write_text("existing agent\n")
     skill.write_text("existing Skill\n")
+    command.write_text("existing command\n")
 
     completed = subprocess.run(
         ["sh", str(release / "installer" / "install-macos.sh")],
@@ -163,7 +181,86 @@ def test_install_preserves_existing_profile_files(tmp_path: Path) -> None:
     assert scenario.read_text() == "existing scenario\n"
     assert agent.read_text() == "existing agent\n"
     assert skill.read_text() == "existing Skill\n"
+    assert command.read_text() == "existing command\n"
+    assert not (data_dir / ".open-studio-command.sha256").exists()
     assert "preserved existing profile file" in completed.stdout
+    assert "preserved existing GigaCode command" in completed.stdout
+
+
+def test_install_seeds_simple_skills_scenario_when_dependencies_exist(
+    tmp_path: Path,
+) -> None:
+    release, fake_python, fake_gigacode = synthetic_release(tmp_path)
+    environment = installer_environment(tmp_path, fake_python, fake_gigacode)
+    skills_dir = Path(environment["HOME"]) / ".gigacode" / "skills"
+    for name in ("doc-review", "secure-coding"):
+        skill = skills_dir / name / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text(f"installed {name}\n")
+
+    completed = subprocess.run(
+        ["sh", str(release / "installer" / "install-macos.sh")],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+
+    installed = (
+        Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
+        / "scenarios"
+        / "corporate-simple-skills.yaml"
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert installed.read_text() == (
+        ROOT
+        / "corporate-profile"
+        / "optional-scenarios"
+        / "corporate-simple-skills.yaml"
+    ).read_text()
+    assert "installed corporate profile file" in completed.stdout
+
+
+def test_failed_install_rolls_back_seeded_simple_skills_scenario_only(
+    tmp_path: Path,
+) -> None:
+    release, fake_python, fake_gigacode = synthetic_release(tmp_path)
+    environment = installer_environment(tmp_path, fake_python, fake_gigacode)
+    environment["GAR_FAIL_AFTER"] = "seed"
+    skills_dir = Path(environment["HOME"]) / ".gigacode" / "skills"
+    installed_skills: list[Path] = []
+    for name in ("doc-review", "secure-coding"):
+        skill = skills_dir / name / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text(f"installed {name}\n")
+        installed_skills.append(skill)
+
+    completed = subprocess.run(
+        ["sh", str(release / "installer" / "install-macos.sh")],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+
+    optional_scenario = (
+        Path(environment["GIGACODE_AGENT_RUNTIME_DATA_DIR"])
+        / "scenarios"
+        / "corporate-simple-skills.yaml"
+    )
+    assert completed.returncode != 0
+    assert not optional_scenario.exists()
+    assert all(skill.is_file() for skill in installed_skills)
+
+
+def test_open_studio_command_has_exact_custom_command_contract() -> None:
+    command = (
+        ROOT / "corporate-profile" / "commands" / "open_studio.md"
+    ).read_text(encoding="utf-8")
+
+    assert command.startswith("---\ndescription:")
+    assert "`open_studio`" in command
+    assert "gigacode-agent-runtime" in command
+    assert "agent-runtime studio --open" in command
+    assert "редактируй" in command
 
 
 def test_install_replaces_non_runnable_version_directory(tmp_path: Path) -> None:

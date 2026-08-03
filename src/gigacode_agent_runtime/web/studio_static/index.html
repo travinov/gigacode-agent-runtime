@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>GigaCode Runtime Studio</title>
+    <link rel="icon" href="/assets/icons.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/assets/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-mark" aria-hidden="true">G</div>
+        <div class="brand-copy">
+          <strong>Runtime Studio</strong>
+          <span>GigaCode Agent Runtime</span>
+        </div>
+        <nav class="primary-nav" aria-label="Разделы Studio">
+          <button class="nav-item active" data-kind="config">Настройки</button>
+          <button class="nav-item" data-kind="scenario">Маршруты</button>
+          <button class="nav-item" data-kind="agent">Агенты</button>
+          <button class="nav-item" data-kind="skill">Скиллы</button>
+        </nav>
+        <div class="local-badge"><span></span> Только localhost</div>
+      </header>
+
+      <aside class="catalog-panel">
+        <div class="catalog-heading">
+          <div>
+            <span class="eyebrow">Справочник</span>
+            <h1 id="catalog-title">Настройки</h1>
+          </div>
+          <button id="new-resource" class="icon-button" title="Создать" aria-label="Создать">+</button>
+        </div>
+        <label class="search-box">
+          <span aria-hidden="true">⌕</span>
+          <input id="catalog-search" type="search" placeholder="Поиск">
+        </label>
+        <div id="catalog-list" class="catalog-list" aria-live="polite"></div>
+        <div class="catalog-footer">
+          <span>Источник истины</span>
+          <code id="managed-root">—</code>
+        </div>
+      </aside>
+
+      <main class="workspace-panel">
+        <div id="connection-state" class="connection-state">
+          <span class="pulse"></span><span>Подключение к Studio…</span>
+        </div>
+        <section id="editor-shell" class="editor-shell" hidden>
+          <div class="editor-heading">
+            <div>
+              <div class="resource-meta">
+                <span id="resource-kind" class="kind-pill">CONFIG</span>
+                <span id="resource-scope" class="scope-pill">selected</span>
+              </div>
+              <h2 id="resource-title">Настройки Runtime</h2>
+              <p id="resource-path" class="resource-path"></p>
+            </div>
+            <div class="editor-actions">
+              <span id="dirty-state" class="dirty-state">Нет изменений</span>
+              <button id="reload-resource" class="button secondary">Сбросить</button>
+              <button id="preview-resource" class="button primary">Проверить и сохранить</button>
+            </div>
+          </div>
+          <div id="editor-content" class="editor-content"></div>
+        </section>
+      </main>
+
+      <aside class="inspector-panel">
+        <div class="inspector-section">
+          <span class="eyebrow">Безопасность</span>
+          <h3>Изменения под контролем</h3>
+          <ol class="safety-flow">
+            <li><span>1</span><div><strong>Валидация</strong><small>Production-схемы и компилятор плана</small></div></li>
+            <li><span>2</span><div><strong>Preview</strong><small>Точный путь, diff и хеши</small></div></li>
+            <li><span>3</span><div><strong>Apply</strong><small>Lock, backup, atomic write, rollback</small></div></li>
+          </ol>
+        </div>
+        <div class="inspector-section">
+          <span class="eyebrow">Управляемые пути</span>
+          <dl id="managed-paths" class="path-list"></dl>
+        </div>
+        <div class="inspector-section activation-note">
+          <span aria-hidden="true">↻</span>
+          <p id="activation-copy">Настройки Runtime применятся после переподключения MCP.</p>
+        </div>
+      </aside>
+    </div>
+
+    <dialog id="preview-dialog" class="preview-dialog">
+      <form method="dialog" class="dialog-shell">
+        <header>
+          <div>
+            <span class="eyebrow">Одноразовая транзакция</span>
+            <h2>Проверка перед записью</h2>
+          </div>
+          <button value="cancel" class="icon-button" aria-label="Закрыть">×</button>
+        </header>
+        <div id="preview-summary" class="preview-summary"></div>
+        <div class="preview-grid">
+          <section>
+            <h3>Диагностика</h3>
+            <pre id="preview-validation" class="diagnostic-output"></pre>
+          </section>
+          <section>
+            <h3>Diff</h3>
+            <pre id="preview-diff" class="diff-output"></pre>
+          </section>
+        </div>
+        <footer>
+          <p id="preview-activation"></p>
+          <button value="cancel" class="button secondary">Отмена</button>
+          <button id="apply-resource" value="default" type="button" class="button danger">Apply — записать файл</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/assets/app.js" defer></script>
+  </body>
+</html>

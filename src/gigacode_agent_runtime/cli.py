@@ -146,6 +146,11 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--open", action="store_true", dest="open_browser")
     _add_json(dashboard)
 
+    studio = subparsers.add_parser("studio")
+    studio.add_argument("--workspace", type=Path, default=Path.cwd())
+    studio.add_argument("--open", action="store_true", dest="open_browser")
+    _add_json(studio)
+
     mcp_serve = subparsers.add_parser("mcp-serve")
     _add_json(mcp_serve)
     return parser
@@ -285,6 +290,50 @@ async def _dashboard_foreground(
         assert isinstance(data, dict)
         url = str(data["url"])
         emit({"url": url}, as_json=as_json, human=url)
+        if open_browser:
+            webbrowser.open(url)
+        await anyio.sleep_forever()
+    return 0
+
+
+async def _studio_foreground(
+    config: EffectiveConfig,
+    workspace: Path,
+    *,
+    open_browser: bool,
+    as_json: bool,
+) -> int:
+    resolved_workspace = workspace.expanduser().resolve(strict=False)
+    if not resolved_workspace.is_dir():
+        raise AgentRuntimeError(
+            ErrorCode.PATH_NOT_ALLOWED,
+            f"Workspace directory does not exist: {resolved_workspace}",
+            details={"workspace": str(resolved_workspace)},
+        )
+    tools = McpToolService(
+        config,
+        project_scenarios=resolved_workspace / ".gigacode" / "scenarios",
+    )
+    async with tools:
+        response = await tools.open_studio()
+        if response["ok"] is not True:
+            raw = response["error"]
+            assert isinstance(raw, dict)
+            raise AgentRuntimeError(
+                ErrorCode(str(raw["code"])),
+                str(raw["message"]),
+                details=(
+                    raw["details"] if isinstance(raw.get("details"), dict) else {}
+                ),
+            )
+        data = response["data"]
+        assert isinstance(data, dict)
+        url = str(data["url"])
+        emit(
+            {"url": url, "workspace": str(resolved_workspace)},
+            as_json=as_json,
+            human=url,
+        )
         if open_browser:
             webbrowser.open(url)
         await anyio.sleep_forever()
@@ -562,6 +611,16 @@ def _execute(arguments: argparse.Namespace, config: EffectiveConfig) -> int:
             ),
             config,
             arguments.run_id,
+        )
+    if arguments.command == "studio":
+        return anyio.run(
+            partial(
+                _studio_foreground,
+                open_browser=arguments.open_browser,
+                as_json=as_json,
+            ),
+            config,
+            arguments.workspace,
         )
     if arguments.command == "mcp-serve":
         tools = McpToolService(

@@ -60,6 +60,16 @@ case "\${1:-}" in
   --version) echo "agent-runtime 1.0.0" ;;
   diagnose) echo '{"status":"ok","checks":[]}' ;;
   mcp-serve) exit 0 ;;
+  skills)
+    case "\${2:-}" in
+      describe)
+        skill_name=\${3#gigacode:}
+        [ -f "\$HOME/.gigacode/skills/\$skill_name/SKILL.md" ] || exit 4
+        echo "{\"name\":\"\$skill_name\"}"
+        ;;
+      *) echo '{"skills":[]}' ;;
+    esac
+    ;;
   *) exit 0 ;;
 esac
 EOF

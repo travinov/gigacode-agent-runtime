@@ -7,9 +7,12 @@ GAR_BIN_DIR=${GIGACODE_AGENT_RUNTIME_BIN_DIR:-"$HOME/.local/bin"}
 GAR_DATA_DIR=${GIGACODE_AGENT_RUNTIME_DATA_DIR:-"$HOME/.gigacode/agent-runtime"}
 GAR_AGENTS_DIR=${GIGACODE_AGENT_RUNTIME_AGENTS_DIR:-"$HOME/.gigacode/agents"}
 GAR_SKILLS_DIR=${GIGACODE_AGENT_RUNTIME_SKILLS_DIR:-"$HOME/.gigacode/skills"}
+GAR_COMMANDS_DIR=${GIGACODE_AGENT_RUNTIME_COMMANDS_DIR:-"$HOME/.gigacode/commands"}
 GAR_CURRENT_LINK="$GAR_INSTALL_ROOT/current"
 GAR_PREVIOUS_FILE="$GAR_INSTALL_ROOT/previous-target"
 GAR_LAUNCHER="$GAR_BIN_DIR/agent-runtime"
+GAR_STUDIO_COMMAND="$GAR_COMMANDS_DIR/open_studio.md"
+GAR_STUDIO_COMMAND_MARKER="$GAR_DATA_DIR/.open-studio-command.sha256"
 
 gar_die() {
   echo "error: $*" >&2
@@ -18,6 +21,10 @@ gar_die() {
 
 gar_require_command() {
   command -v "$1" >/dev/null 2>&1 || gar_die "required command not found: $1"
+}
+
+gar_sha256_file() {
+  shasum -a 256 "$1" | awk '{print $1}'
 }
 
 gar_assert_platform() {

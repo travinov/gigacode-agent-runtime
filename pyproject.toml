@@ -58,7 +58,7 @@ where = ["src"]
   "_catalog/scenarios/*.yaml",
   "_catalog/schemas/*.json",
 ]
-"gigacode_agent_runtime.web" = ["static/*"]
+"gigacode_agent_runtime.web" = ["static/*", "studio_static/*"]
 
 [tool.setuptools.data-files]
 "share/gigacode-agent-runtime/schemas" = ["schemas/*.schema.json"]
