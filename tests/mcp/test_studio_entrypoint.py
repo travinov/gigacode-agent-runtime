@@ -28,13 +28,14 @@ async def test_open_studio_is_lazy_authenticated_and_non_mutating(
     before = _snapshot(tmp_path)
 
     async with tools:
-        response = await tools.open_studio()
+        response = await tools.open_studio(open_browser=False)
         during = _snapshot(tmp_path)
 
     assert response["ok"] is True
     url = str(response["data"]["url"])
     assert url.startswith("http://127.0.0.1:")
     assert "/#token=" in url
+    assert response["data"]["browser_opened"] is False
     assert during == before
 
 
@@ -46,7 +47,7 @@ async def test_dashboard_and_studio_servers_coexist_on_distinct_ports(
 
     async with tools:
         dashboard = await tools.open_dashboard()
-        studio = await tools.open_studio()
+        studio = await tools.open_studio(open_browser=False)
 
     dashboard_url = str(dashboard["data"]["url"])
     studio_url = str(studio["data"]["url"])
@@ -71,10 +72,39 @@ async def test_injected_open_studio_url_keeps_tool_side_effect_free(
         studio_url=studio_url,
     )
     async with tools:
-        response = await tools.open_studio()
+        response = await tools.open_studio(open_browser=False)
 
     assert calls == 1
     assert response == {
         "ok": True,
-        "data": {"url": "http://127.0.0.1:43210/#token=test"},
+        "data": {
+            "url": "http://127.0.0.1:43210/#token=test",
+            "browser_opened": False,
+        },
     }
+
+
+@pytest.mark.anyio
+async def test_open_studio_opens_exact_fragment_url_by_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opened: list[str] = []
+
+    def open_browser(url: str) -> bool:
+        opened.append(url)
+        return True
+
+    monkeypatch.setattr(
+        "gigacode_agent_runtime.mcp_tools.webbrowser.open",
+        open_browser,
+    )
+    tools = McpToolService(scheduler_config(tmp_path))
+
+    async with tools:
+        response = await tools.open_studio()
+
+    url = str(response["data"]["url"])
+    assert opened == [url]
+    assert "/#token=" in url
+    assert response["data"]["browser_opened"] is True

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from collections.abc import Mapping
 
@@ -30,6 +31,25 @@ _PERMISSION_CODES = {
     ErrorCode.PERMISSION_DENIED,
     ErrorCode.APPROVAL_REQUIRED,
 }
+
+
+def terminal_hyperlink(
+    label: str,
+    url: str,
+    *,
+    enabled: bool | None = None,
+) -> str:
+    """Render an OSC 8 link plus a plain URL fallback for local terminals."""
+
+    supported = (
+        sys.stdout.isatty() and os.environ.get("TERM") != "dumb"
+        if enabled is None
+        else enabled
+    )
+    if not supported:
+        return url
+    linked = f"\033]8;;{url}\033\\{label}\033]8;;\033\\"
+    return f"{linked}\n{url}"
 
 
 def error_exit_code(error: AgentRuntimeError) -> int:

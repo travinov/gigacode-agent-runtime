@@ -778,8 +778,16 @@ async function bootstrap() {
   const fragment = new URLSearchParams(window.location.hash.slice(1));
   const token = fragment.get("token");
   history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-  if (!token) throw new Error("Одноразовый bootstrap token отсутствует. Откройте Studio заново из GigaCode.");
-  const auth = await api("/api/bootstrap", { method: "POST", body: JSON.stringify({ token }) });
+  let auth;
+  if (token) {
+    auth = await api("/api/bootstrap", { method: "POST", body: JSON.stringify({ token }) });
+  } else {
+    try {
+      auth = await api("/api/session");
+    } catch (_error) {
+      throw new Error("Одноразовый bootstrap token отсутствует, а действующая сессия не найдена. Откройте Studio заново из GigaCode.");
+    }
+  }
   state.csrf = auth.csrf_token;
   await loadCatalog();
   await selectResource("config", "selected");

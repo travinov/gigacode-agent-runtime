@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import webbrowser
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from types import TracebackType
@@ -640,11 +641,20 @@ class McpToolService:
 
         return await public_result(operation)
 
-    async def open_studio(self) -> dict[str, object]:
-        """Return an authenticated URL without changing any managed file."""
+    async def open_studio(self, open_browser: bool = True) -> dict[str, object]:
+        """Open or return an authenticated URL without changing managed files."""
 
         async def operation() -> dict[str, object]:
             self._require_started()
-            return {"url": await self._ensure_studio()}
+            url = await self._ensure_studio()
+            browser_opened = False
+            if open_browser:
+                try:
+                    browser_opened = bool(
+                        await anyio.to_thread.run_sync(webbrowser.open, url)
+                    )
+                except (OSError, webbrowser.Error):
+                    browser_opened = False
+            return {"url": url, "browser_opened": browser_opened}
 
         return await public_result(operation)

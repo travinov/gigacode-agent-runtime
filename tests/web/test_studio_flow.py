@@ -105,6 +105,23 @@ async def test_studio_auth_is_separate_from_dashboard(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
+async def test_studio_session_endpoint_supports_refresh_without_bootstrap_token(
+    tmp_path: Path,
+) -> None:
+    _config, _service, auth, client = _studio_fixture(tmp_path)
+    try:
+        missing = await client.get("/api/session")
+        csrf = await _authenticate(client, auth)
+        refreshed = await client.get("/api/session")
+    finally:
+        await client.aclose()
+
+    assert missing.status_code == 403
+    assert refreshed.status_code == 200
+    assert refreshed.json()["data"]["csrf_token"] == csrf
+
+
+@pytest.mark.anyio
 async def test_studio_catalog_detail_preview_and_one_shot_apply(tmp_path: Path) -> None:
     _config, service, auth, client = _studio_fixture(tmp_path)
     try:

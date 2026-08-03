@@ -23,6 +23,7 @@ from .cli_format import (
     emit,
     emit_error,
     state_exit_code,
+    terminal_hyperlink,
 )
 from .config import EffectiveConfig, load_config
 from .diagnostics import diagnose_runtime
@@ -289,7 +290,11 @@ async def _dashboard_foreground(
         data = response["data"]
         assert isinstance(data, dict)
         url = str(data["url"])
-        emit({"url": url}, as_json=as_json, human=url)
+        emit(
+            {"url": url},
+            as_json=as_json,
+            human=terminal_hyperlink("Открыть Runtime Dashboard", url),
+        )
         if open_browser:
             webbrowser.open(url)
         await anyio.sleep_forever()
@@ -315,7 +320,7 @@ async def _studio_foreground(
         project_scenarios=resolved_workspace / ".gigacode" / "scenarios",
     )
     async with tools:
-        response = await tools.open_studio()
+        response = await tools.open_studio(open_browser=open_browser)
         if response["ok"] is not True:
             raw = response["error"]
             assert isinstance(raw, dict)
@@ -332,10 +337,8 @@ async def _studio_foreground(
         emit(
             {"url": url, "workspace": str(resolved_workspace)},
             as_json=as_json,
-            human=url,
+            human=terminal_hyperlink("Открыть Runtime Studio", url),
         )
-        if open_browser:
-            webbrowser.open(url)
         await anyio.sleep_forever()
     return 0
 

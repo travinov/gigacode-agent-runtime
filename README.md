@@ -1316,11 +1316,18 @@ GigaCode точной командой:
 ```
 
 Команда устанавливается как `~/.gigacode/commands/open_studio.md` и просит
-GigaCode вызвать MCP tool `open_studio`. Прямой CLI-вариант:
+GigaCode вызвать MCP tool `open_studio(open_browser=true)`. MCP-процесс сам
+передаёт браузеру полный одноразовый URL, поэтому fragment с bootstrap-токеном
+не зависит от обработки ссылок в чате. Прямой CLI-вариант:
 
 ```bash
 agent-runtime studio --workspace "$PWD" --open
 ```
+
+Без `--open` CLI печатает OSC 8-ссылку «Открыть Runtime Studio» и обычный URL
+как fallback. После первого входа обновление страницы использует действующую
+HttpOnly session cookie и не требует нового bootstrap-токена. Полный URL с
+`#token=` одноразовый; не публикуйте его в логах и переписке.
 
 Studio показывает точный target path, server-side validation, скомпилированные
 waves, bounded diff и hashes до записи. `Apply` является одноразовой

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.0-rc.16] - 2026-08-03
+
+### Fixed
+
+- Open the exact Studio bootstrap URL from the local MCP process by default so
+  GigaCode link rendering cannot drop the token fragment.
+- Restore an authenticated Studio page from its HttpOnly session cookie after
+  refresh instead of requiring a second one-time bootstrap token.
+
+### Added
+
+- Render Dashboard and Studio terminal URLs as OSC 8 hyperlinks with a plain
+  URL fallback.
+
 ## [1.0.0-rc.15] - 2026-08-03
 
 ### Fixed

@@ -125,6 +125,21 @@ def create_studio_app(
         except AgentRuntimeError as error:
             return _studio_error(error)
 
+    async def current_session(request: Request) -> Response:
+        try:
+            authenticated = session(request)
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "data": {
+                        "csrf_token": authenticated.csrf_token,
+                        "expires_at": authenticated.expires_at,
+                    },
+                }
+            )
+        except AgentRuntimeError as error:
+            return _studio_error(error)
+
     async def detail(request: Request) -> Response:
         try:
             session(request)
@@ -170,6 +185,7 @@ def create_studio_app(
         Route("/", index),
         Route("/assets/{name}", asset),
         Route("/api/bootstrap", bootstrap, methods=["POST"]),
+        Route("/api/session", current_session),
         Route("/api/studio/catalog", catalog),
         Route(
             "/api/studio/resources/{kind}/{scope}",

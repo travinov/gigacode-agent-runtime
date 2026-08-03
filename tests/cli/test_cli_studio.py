@@ -47,19 +47,21 @@ async def test_studio_foreground_selects_workspace_and_emits_json(
         ) -> None:
             return None
 
-        async def open_studio(self) -> dict[str, object]:
+        async def open_studio(self, open_browser: bool = True) -> dict[str, object]:
+            observed["open_browser"] = open_browser
             return {
                 "ok": True,
-                "data": {"url": "http://127.0.0.1:43210/#token=test"},
+                "data": {
+                    "url": "http://127.0.0.1:43210/#token=test",
+                    "browser_opened": open_browser,
+                },
             }
 
     async def return_immediately() -> None:
         return None
 
-    opened: list[str] = []
     monkeypatch.setattr(cli, "McpToolService", FakeTools)
     monkeypatch.setattr(cli.anyio, "sleep_forever", return_immediately)
-    monkeypatch.setattr(cli.webbrowser, "open", opened.append)
     config = scheduler_config(tmp_path)
 
     result = await _studio_foreground(
@@ -72,8 +74,8 @@ async def test_studio_foreground_selects_workspace_and_emits_json(
 
     assert result == 0
     assert observed["project_scenarios"] == tmp_path / ".gigacode" / "scenarios"
+    assert observed["open_browser"] is True
     assert output == {
         "url": "http://127.0.0.1:43210/#token=test",
         "workspace": str(tmp_path),
     }
-    assert opened == ["http://127.0.0.1:43210/#token=test"]

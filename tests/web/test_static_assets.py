@@ -31,6 +31,7 @@ def test_studio_assets_are_offline_and_cover_structured_editors() -> None:
     assert "<script>" not in html
     assert "history.replaceState" in javascript
     assert "window.location.hash" in javascript
+    assert "/api/session" in javascript
     assert "/api/studio/catalog" in javascript
     assert "/api/studio/preview" in javascript
     assert "/api/studio/apply" in javascript

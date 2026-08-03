@@ -2,7 +2,8 @@
 description: Открыть локальный Web UI настройки GigaCode Agent Runtime
 ---
 
-Вызови MCP tool `open_studio` сервера `gigacode-agent-runtime`.
+Вызови MCP tool `open_studio` сервера `gigacode-agent-runtime` с
+`open_browser: true`.
 
 Не редактируй config, YAML-сценарии, файлы агентов или Skills напрямую и не
 заменяй MCP-вызов shell-командой. После успешного вызова сообщи пользователю,

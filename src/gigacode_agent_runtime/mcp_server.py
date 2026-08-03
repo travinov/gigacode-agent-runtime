@@ -73,8 +73,9 @@ TOOL_DESCRIPTIONS = {
     "cancel_run": "Cancel an agent run and terminate its active processes.",
     "open_dashboard": "Open the authenticated local monitoring dashboard URL.",
     "open_studio": (
-        "Open the authenticated local Configuration Studio URL without changing "
-        "managed files."
+        "Start the authenticated local Configuration Studio, open its exact "
+        "one-time URL in the default browser unless open_browser is false, and "
+        "return the URL without changing managed files."
     ),
 }
 TOOL_NAMES = tuple(TOOL_DESCRIPTIONS)
