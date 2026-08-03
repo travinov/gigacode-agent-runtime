@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["result", "approved", "score", "skill_example"],
+  "properties": {
+    "result": {"type": "string"},
+    "approved": {"type": "boolean"},
+    "score": {"type": "number"},
+    "skill_example": {"const": "RUNTIME_ALL_FIELDS_SKILL_OK"}
+  },
+  "additionalProperties": false
+}

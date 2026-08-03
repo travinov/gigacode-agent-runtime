@@ -1,0 +1,52 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: full-access-loop
+  title: Full access loop
+
+agents:
+  creator:
+    model: code-model-id
+    permissions: full_access
+    system_prompt: Improve the candidate.
+  reviewer:
+    model: review-model-id
+    permissions: read_only
+    system_prompt: Review the candidate.
+
+steps:
+  improve:
+    kind: loop
+    needs: []
+    max_iterations: 8
+    timeout_seconds: 3600
+    on_limit: pause
+    body:
+      steps:
+        review:
+          kind: agent
+          agent: reviewer
+          needs: []
+          prompt:
+            template: Review current candidate.
+          output_schema:
+            type: object
+            properties:
+              approved:
+                type: boolean
+        repair:
+          kind: agent
+          agent: creator
+          needs: [review]
+          prompt:
+            template: "Repair using ${loop.steps.review.output}"
+          output_schema:
+            type: object
+    until:
+      ref: "${loop.steps.review.output.approved}"
+      op: eq
+      value: true
+
+result:
+  from: "${steps.improve.output}"

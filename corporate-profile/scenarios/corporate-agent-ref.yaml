@@ -1,0 +1,45 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: corporate-agent-ref
+  title: Corporate reusable GigaCode business analyst
+  description: Load a native user agent from ~/.gigacode/agents and run it safely.
+
+inputs:
+  task:
+    type: string
+    required: true
+    description: Product or project idea to formalize.
+
+agents:
+  business_analyst:
+    agent_ref: gigacode:business-analyst-proactive
+    model: vllm/Qwen3.6-35B-262k
+    permissions: propose_only
+
+steps:
+  analyze:
+    kind: agent
+    agent: business_analyst
+    needs: []
+    prompt:
+      template: "Формализуй требования для задачи: ${inputs.task}"
+    output_schema:
+      type: object
+      required: [analysis, open_questions, next_steps]
+      properties:
+        analysis:
+          type: string
+        open_questions:
+          type: array
+          items:
+            type: string
+        next_steps:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+
+result:
+  from: "${steps.analyze.output}"

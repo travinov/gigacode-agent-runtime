@@ -1,0 +1,42 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+metadata:
+  name: sequential
+  title: Sequential creator and reviewer
+  description: Create a structured draft, then review it with a second agent.
+inputs:
+  task: {type: string, required: true, description: Work item for the creator.}
+agents:
+  creator:
+    model: REPLACE_WITH_GIGACODE_MODEL_ID
+    permissions: propose_only
+    system_prompt: Create a concise structured draft without modifying the workspace.
+  reviewer:
+    model: REPLACE_WITH_GIGACODE_REVIEW_MODEL_ID
+    permissions: read_only
+    system_prompt: Review the draft and return structured findings.
+steps:
+  create:
+    kind: agent
+    agent: creator
+    needs: []
+    prompt: {template: "Create a draft for: ${inputs.task}"}
+    output_schema:
+      type: object
+      required: [draft]
+      properties: {draft: {type: string}}
+      additionalProperties: false
+  review:
+    kind: agent
+    agent: reviewer
+    needs: [create]
+    prompt: {template: "Review this draft: ${steps.create.output.draft}"}
+    output_schema:
+      type: object
+      required: [approved, feedback]
+      properties:
+        approved: {type: boolean}
+        feedback: {type: string}
+      additionalProperties: false
+result:
+  from: "${steps.review.output}"

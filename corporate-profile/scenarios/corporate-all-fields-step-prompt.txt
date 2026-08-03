@@ -1,0 +1,10 @@
+Build a concise validation record for this task:
+
+${inputs.task}
+
+Previous inspection:
+
+${steps.inspect.output}
+
+Use the values supplied in prompt.context as supporting metadata. Return only
+the JSON object required by output_schema.

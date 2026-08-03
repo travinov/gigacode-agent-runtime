@@ -1,0 +1,34 @@
+schema_version: gigacode-agent-runtime/config-v1
+
+runtime:
+  data_dir: ~/custom-runtime
+  max_parallel_agents: 6
+  default_step_timeout_seconds: 1200
+  graceful_cancel_seconds: 15
+  max_stdout_bytes_per_step: 1048576
+  max_stderr_bytes_per_step: 524288
+
+gigacode:
+  executable: /opt/corporate/bin/gigacode
+  model_allowlist:
+    - code-model-id
+    - review-model-id
+  environment_allowlist:
+    - PATH
+    - HOME
+    - HTTPS_PROXY
+
+permissions:
+  default: propose_only
+  allow_full_access: true
+  require_full_access_confirmation: true
+  max_parallel_full_access_agents: 2
+  max_full_access_loop_iterations: 4
+  trusted_scenario_hashes:
+    trusted-release: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+web:
+  enabled: true
+  host: 127.0.0.1
+  port: 8765
+  open_automatically: false

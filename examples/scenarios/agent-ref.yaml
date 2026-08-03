@@ -1,0 +1,26 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+metadata:
+  name: agent-ref
+  title: Reusable native GigaCode agent
+  description: Resolve a user agent by name and snapshot it into the run plan.
+inputs:
+  task: {type: string, required: true}
+agents:
+  analyst:
+    agent_ref: gigacode:business-analyst-proactive
+    model: REPLACE_WITH_GIGACODE_MODEL_ID
+    permissions: propose_only
+steps:
+  analyze:
+    kind: agent
+    agent: analyst
+    needs: []
+    prompt: {template: "Formalize requirements for: ${inputs.task}"}
+    output_schema:
+      type: object
+      required: [analysis]
+      properties: {analysis: {type: string}}
+      additionalProperties: false
+result:
+  from: "${steps.analyze.output}"

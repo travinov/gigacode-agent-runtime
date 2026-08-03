@@ -1,0 +1,8 @@
+{
+  "delay_seconds": 0,
+  "exit_code": 0,
+  "invalid_attempts": 1,
+  "result": {
+    "summary": "valid after retry"
+  }
+}

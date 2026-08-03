@@ -1,0 +1,65 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: corporate-sequential
+  title: Corporate creator and independent reviewer
+  description: Create a structured draft, then review it with a second model.
+
+inputs:
+  task:
+    type: string
+    required: true
+    description: Safe task for the corporate acceptance run.
+
+agents:
+  creator:
+    model: vllm/Qwen3.6-35B-262k
+    permissions: propose_only
+    system_prompt: |
+      Ты автор решения. Верни только структурированный результат по output_schema.
+      Не изменяй файлы рабочего каталога.
+
+  reviewer:
+    model: vllm/DeepSeek-V4-Flash-0731-262k
+    permissions: read_only
+    system_prompt: |
+      Ты независимый reviewer. Проверь полноту, безопасность и выполнимость.
+      Верни только структурированный результат по output_schema.
+
+steps:
+  create:
+    kind: agent
+    agent: creator
+    needs: []
+    prompt:
+      template: "Подготовь решение задачи: ${inputs.task}"
+    output_schema:
+      type: object
+      required: [draft]
+      properties:
+        draft:
+          type: string
+      additionalProperties: false
+
+  review:
+    kind: agent
+    agent: reviewer
+    needs: [create]
+    prompt:
+      template: |
+        Проверь решение для задачи "${inputs.task}":
+
+        ${steps.create.output.draft}
+    output_schema:
+      type: object
+      required: [approved, feedback]
+      properties:
+        approved:
+          type: boolean
+        feedback:
+          type: string
+      additionalProperties: false
+
+result:
+  from: "${steps.review.output}"

@@ -1,0 +1,19 @@
+{
+  "format_version": 1,
+  "product": "gigacode-agent-runtime",
+  "version": "1.0.0",
+  "platform": "macos",
+  "minimum_macos_version": "10.15",
+  "architectures": [
+    "x86_64"
+  ],
+  "python_minors": [
+    "3.11",
+    "3.12",
+    "3.13",
+    "3.14"
+  ],
+  "transport": "stdio",
+  "release_stage": "release-candidate",
+  "files": []
+}

@@ -1,0 +1,53 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+metadata:
+  name: parallel
+  title: Parallel analysis with fan-in
+  description: Run two independent analyses concurrently, then synthesize them.
+inputs:
+  task: {type: string, required: true}
+agents:
+  analyst:
+    model: REPLACE_WITH_GIGACODE_MODEL_ID
+    permissions: read_only
+    system_prompt: Analyze the task from the assigned perspective.
+  synthesizer:
+    model: REPLACE_WITH_GIGACODE_REVIEW_MODEL_ID
+    permissions: propose_only
+    system_prompt: Reconcile two analyses into one structured recommendation.
+steps:
+  technical_analysis:
+    kind: agent
+    agent: analyst
+    needs: []
+    prompt: {template: "Analyze technical risks for: ${inputs.task}"}
+    output_schema:
+      type: object
+      required: [findings]
+      properties: {findings: {type: array, items: {type: string}}}
+      additionalProperties: false
+  operational_analysis:
+    kind: agent
+    agent: analyst
+    needs: []
+    prompt: {template: "Analyze operational risks for: ${inputs.task}"}
+    output_schema:
+      type: object
+      required: [findings]
+      properties: {findings: {type: array, items: {type: string}}}
+      additionalProperties: false
+  synthesize:
+    kind: agent
+    agent: synthesizer
+    needs: [technical_analysis, operational_analysis]
+    prompt:
+      template: >-
+        Synthesize technical ${steps.technical_analysis.output.findings}
+        and operational ${steps.operational_analysis.output.findings}.
+    output_schema:
+      type: object
+      required: [recommendation]
+      properties: {recommendation: {type: string}}
+      additionalProperties: false
+result:
+  from: "${steps.synthesize.output}"

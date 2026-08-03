@@ -2,6 +2,12 @@
 __pycache__/
 *.py[cod]
 .venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.playwright-cli/
+.coverage
 dist/
 build/
+output/
 *.egg-info/

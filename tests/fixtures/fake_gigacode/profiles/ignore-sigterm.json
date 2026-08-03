@@ -1,0 +1,8 @@
+{
+  "delay_seconds": 30,
+  "exit_code": 0,
+  "ignore_sigterm": true,
+  "result": {
+    "summary": "too late"
+  }
+}

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GigaCode Agent Runtime</title>
+  <link rel="icon" href="/assets/icons.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">К содержимому</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Запуски">
+      <div class="brand">
+        <svg class="brand-mark" aria-hidden="true"><use href="/assets/icons.svg#network"></use></svg>
+        <div>
+          <strong>Agent Runtime</strong>
+          <span>GigaCode / Qwen CLI</span>
+        </div>
+      </div>
+      <div class="connection-row">
+        <span id="connection-dot" class="connection-dot"></span>
+        <span id="connection-label">Подключение…</span>
+      </div>
+      <button id="refresh-runs" class="secondary-button" type="button">Обновить список</button>
+      <nav id="run-list" class="run-list" aria-label="Список запусков"></nav>
+    </aside>
+
+    <main id="main" class="workspace" tabindex="-1">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Локальный мониторинг</p>
+          <h1 id="run-title">Выберите запуск</h1>
+          <p id="run-subtitle" class="muted">Состояние агентов сохраняется на этой машине.</p>
+        </div>
+        <div id="controls" class="controls" hidden>
+          <button data-action="pause" class="secondary-button" type="button">Пауза</button>
+          <button data-action="resume" class="primary-button" type="button">Продолжить</button>
+          <button data-action="cancel" class="danger-button" type="button">Отменить</button>
+        </div>
+      </header>
+
+      <section id="empty-state" class="empty-state">
+        <svg aria-hidden="true"><use href="/assets/icons.svg#pulse"></use></svg>
+        <h2>Здесь появится ход сценария</h2>
+        <p>Запустите сценарий через MCP или CLI и выберите его слева.</p>
+      </section>
+
+      <div id="dashboard" hidden>
+        <section class="metrics" aria-label="Сводка">
+          <article><span>Статус</span><strong id="metric-status">—</strong></article>
+          <article><span>Активность</span><strong id="metric-activity">—</strong></article>
+          <article><span>Шаги</span><strong id="metric-steps">—</strong></article>
+          <article><span>Последнее событие</span><strong id="metric-event">—</strong></article>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">ExecutionPlan</p>
+              <h2>Граф и волны</h2>
+            </div>
+          </div>
+          <div id="waves" class="waves"></div>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <div class="panel-heading"><h2>Агенты и шаги</h2></div>
+            <div id="steps" class="step-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-heading"><h2>Результат</h2></div>
+            <pre id="result-output" class="code-output">Результат ещё не сформирован.</pre>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <div class="panel-heading">
+              <h2>События</h2>
+              <span id="event-count" class="counter">0</span>
+            </div>
+            <ol id="events" class="event-list"></ol>
+          </article>
+          <article class="panel">
+            <div class="panel-heading"><h2>Артефакты</h2></div>
+            <ul id="artifacts" class="artifact-list"></ul>
+          </article>
+        </section>
+
+        <section id="blocker-panel" class="panel blocker-panel" hidden>
+          <div class="panel-heading"><h2>Требуется действие</h2></div>
+          <p id="blocker-message"></p>
+          <div id="approval-form" hidden>
+            <label for="approval-hash">SHA-256 плана</label>
+            <input id="approval-hash" readonly>
+            <button id="approve-button" class="primary-button" type="button">Подтвердить full access</button>
+          </div>
+          <form id="input-form" hidden>
+            <label for="input-value">Ответ в JSON</label>
+            <textarea id="input-value" rows="5">{}</textarea>
+            <button class="primary-button" type="submit">Передать ответ</button>
+          </form>
+        </section>
+      </div>
+      <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    </main>
+  </div>
+</body>
+</html>

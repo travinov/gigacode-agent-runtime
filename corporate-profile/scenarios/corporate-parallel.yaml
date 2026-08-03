@@ -1,0 +1,88 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: corporate-parallel
+  title: Corporate parallel analysis with fan-in
+  description: Run two independent model analyses concurrently, then synthesize.
+
+inputs:
+  task:
+    type: string
+    required: true
+    description: Safe task for parallel corporate acceptance.
+
+max_parallel_agents: 3
+
+agents:
+  technical_analyst:
+    model: vllm/Qwen3.6-35B-262k
+    permissions: read_only
+    system_prompt: |
+      Проанализируй технические риски. Верни только JSON по output_schema.
+
+  operational_analyst:
+    model: vllm/MiniMax-M3-161k
+    permissions: read_only
+    system_prompt: |
+      Проанализируй эксплуатационные риски. Верни только JSON по output_schema.
+
+  synthesizer:
+    model: GigaChat-3.1-Ultra-128k
+    permissions: propose_only
+    system_prompt: |
+      Объедини независимые анализы без изменения файлов рабочего каталога.
+      Верни только JSON по output_schema.
+
+steps:
+  technical_analysis:
+    kind: agent
+    agent: technical_analyst
+    needs: []
+    prompt:
+      template: "Найди технические риски для задачи: ${inputs.task}"
+    output_schema:
+      type: object
+      required: [findings]
+      properties:
+        findings:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+
+  operational_analysis:
+    kind: agent
+    agent: operational_analyst
+    needs: []
+    prompt:
+      template: "Найди эксплуатационные риски для задачи: ${inputs.task}"
+    output_schema:
+      type: object
+      required: [findings]
+      properties:
+        findings:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+
+  synthesize:
+    kind: agent
+    agent: synthesizer
+    needs: [technical_analysis, operational_analysis]
+    prompt:
+      template: |
+        Сформируй итоговую рекомендацию.
+        Технические выводы: ${steps.technical_analysis.output.findings}
+        Эксплуатационные выводы: ${steps.operational_analysis.output.findings}
+    output_schema:
+      type: object
+      required: [recommendation]
+      properties:
+        recommendation:
+          type: string
+      additionalProperties: false
+
+result:
+  from: "${steps.synthesize.output}"

@@ -1,0 +1,121 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: corporate-simple-skills
+  title: Simple installed Skills proof
+  description: Run doc-review and secure-coding in parallel, then combine evidence.
+
+inputs:
+  task:
+    type: string
+    required: true
+    description: Markdown or technical text to review without reading local files.
+
+max_parallel_agents: 2
+
+agents:
+  documentation_reviewer:
+    model: vllm/Qwen3.6-35B-262k
+    permissions: propose_only
+    system_prompt: |
+      Проверь переданный в prompt текст как самостоятельный Markdown-документ.
+      Используй только назначенный Skill doc-review, не читай файлы и не вызывай
+      инструменты. Верни только JSON по output_schema. В поле skill верни строго
+      строку doc-review.
+    skill_refs:
+      - gigacode:doc-review
+
+  security_reviewer:
+    model: vllm/DeepSeek-V4-Flash-0731-262k
+    permissions: propose_only
+    system_prompt: |
+      Проверь переданный в prompt текст и фрагменты кода на очевидные риски
+      безопасной разработки. Используй только назначенный Skill secure-coding,
+      не читай файлы и не вызывай инструменты. Верни только JSON по
+      output_schema. В поле skill верни строго строку secure-coding.
+    skill_refs:
+      - gigacode:secure-coding
+
+  synthesizer:
+    model: vllm/MiniMax-M3-161k
+    permissions: propose_only
+    system_prompt: |
+      Объедини два готовых JSON-ревью без изменения файлов и без вызова
+      инструментов. Не приписывай проверяющим выводы, которых нет в их ответах.
+      Верни только JSON по output_schema.
+
+steps:
+  review_documentation:
+    kind: agent
+    agent: documentation_reviewer
+    needs: []
+    prompt:
+      template: |
+        Проверь этот материал:
+
+        ${inputs.task}
+    output_schema:
+      type: object
+      required: [skill, findings]
+      properties:
+        skill:
+          const: doc-review
+        findings:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+
+  review_security:
+    kind: agent
+    agent: security_reviewer
+    needs: []
+    prompt:
+      template: |
+        Проверь этот материал:
+
+        ${inputs.task}
+    output_schema:
+      type: object
+      required: [skill, findings]
+      properties:
+        skill:
+          const: secure-coding
+        findings:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+
+  synthesize:
+    kind: agent
+    agent: synthesizer
+    needs: [review_documentation, review_security]
+    prompt:
+      template: |
+        Подготовь общий итог двух независимых проверок.
+        Документация: ${steps.review_documentation.output}
+        Безопасность: ${steps.review_security.output}
+        В skills_used укажи ровно doc-review и secure-coding.
+    output_schema:
+      type: object
+      required: [skills_used, summary, recommended_actions]
+      properties:
+        skills_used:
+          type: array
+          minItems: 2
+          maxItems: 2
+          uniqueItems: true
+          items:
+            enum: [doc-review, secure-coding]
+        summary:
+          type: string
+        recommended_actions:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+
+result:
+  from: "${steps.synthesize.output}"

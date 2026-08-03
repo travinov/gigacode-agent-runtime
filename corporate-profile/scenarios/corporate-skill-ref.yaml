@@ -1,0 +1,36 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+metadata:
+  name: corporate-skill-ref
+  title: Corporate explicit Skill allowlist probe
+  description: Verifies that only the Skill assigned through skill_refs reaches the agent.
+inputs:
+  task:
+    type: string
+    required: true
+    description: A short task for the Skill-enabled agent.
+agents:
+  analyst:
+    model: vllm/Qwen3.6-35B-262k
+    permissions: propose_only
+    system_prompt: Complete the task and return only the requested JSON object.
+    skill_refs:
+      - gigacode:runtime-skill-probe
+steps:
+  analyze:
+    kind: agent
+    agent: analyst
+    needs: []
+    prompt:
+      template: "Task: ${inputs.task}"
+    output_schema:
+      type: object
+      required: [summary, skill_marker]
+      properties:
+        summary:
+          type: string
+        skill_marker:
+          const: RUNTIME_SKILL_PROBE_OK
+      additionalProperties: false
+result:
+  from: "${steps.analyze.output}"

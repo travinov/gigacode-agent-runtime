@@ -1,0 +1,109 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: corporate-mixed
+  title: Corporate sequential, parallel, and fan-in workflow
+  description: Prepare once, run two models in parallel, then consolidate.
+
+inputs:
+  task:
+    type: string
+    required: true
+    description: Safe task for mixed orchestration acceptance.
+
+max_parallel_agents: 4
+
+agents:
+  planner:
+    model: vllm/Qwen3.6-35B-262k
+    permissions: read_only
+    system_prompt: |
+      Разложи задачу на конкретные вопросы. Верни только JSON по output_schema.
+
+  implementation_specialist:
+    model: vllm/DeepSeek-V4-Flash-0731-262k
+    permissions: read_only
+    system_prompt: |
+      Ответь с точки зрения реализации. Верни только JSON по output_schema.
+
+  validation_specialist:
+    model: vllm/MiniMax-M3-161k
+    permissions: read_only
+    system_prompt: |
+      Ответь с точки зрения проверки. Верни только JSON по output_schema.
+
+  reviewer:
+    model: GigaChat-3.1-Ultra-128k
+    permissions: propose_only
+    system_prompt: |
+      Объедини результаты двух ветвей. Верни только JSON по output_schema.
+
+steps:
+  prepare:
+    kind: agent
+    agent: planner
+    needs: []
+    prompt:
+      template: "Подготовь вопросы для исследования задачи: ${inputs.task}"
+    output_schema:
+      type: object
+      required: [questions]
+      properties:
+        questions:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+
+  implementation:
+    kind: agent
+    agent: implementation_specialist
+    needs: [prepare]
+    prompt:
+      template: "Ответь с точки зрения реализации: ${steps.prepare.output.questions}"
+    output_schema:
+      type: object
+      required: [answer]
+      properties:
+        answer:
+          type: string
+      additionalProperties: false
+
+  validation:
+    kind: agent
+    agent: validation_specialist
+    needs: [prepare]
+    prompt:
+      template: "Ответь с точки зрения проверки: ${steps.prepare.output.questions}"
+    output_schema:
+      type: object
+      required: [answer]
+      properties:
+        answer:
+          type: string
+      additionalProperties: false
+
+  consolidate:
+    kind: agent
+    agent: reviewer
+    needs: [implementation, validation]
+    prompt:
+      template: |
+        Объедини результаты.
+        Реализация: ${steps.implementation.output.answer}
+        Проверка: ${steps.validation.output.answer}
+    output_schema:
+      type: object
+      required: [summary, next_actions]
+      properties:
+        summary:
+          type: string
+        next_actions:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+
+result:
+  from: "${steps.consolidate.output}"
