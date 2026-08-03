@@ -5,12 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from gigacode_agent_runtime.agent_catalog import AgentProfileCatalog
+from gigacode_agent_runtime.agent_catalog import AgentProfileCatalog, load_agent_profile
 from gigacode_agent_runtime.config import load_config
 from gigacode_agent_runtime.errors import AgentRuntimeError, ErrorCode
 from gigacode_agent_runtime.plan_compiler import compile_plan
 from gigacode_agent_runtime.scenario_loader import load_scenario_file
-from gigacode_agent_runtime.skill_catalog import SkillProfileCatalog
+from gigacode_agent_runtime.skill_catalog import SkillProfileCatalog, load_skill_profile
+from gigacode_agent_runtime.yaml_loader import safe_load
 
 ROOT = Path(__file__).parents[2]
 PUBLIC_DOCS = (
@@ -58,7 +59,7 @@ def test_corporate_profile_is_ready_to_plan_without_edits(
 
     assert set(config.gigacode.model_allowlist) == allowed_models
     assert config.permissions.allow_full_access is True
-    assert len(scenarios) == 6
+    assert len(scenarios) == 7
     for path in scenarios:
         plan = compile_plan(
             load_scenario_file(
@@ -72,6 +73,125 @@ def test_corporate_profile_is_ready_to_plan_without_edits(
         )
         assert plan.metadata.name.startswith("corporate-")
         assert {agent.model for agent in plan.agents.values()} <= allowed_models
+
+
+def test_all_fields_examples_cover_every_supported_object_field(
+    tmp_path: Path,
+) -> None:
+    profile = ROOT / "corporate-profile"
+    agent = load_agent_profile(
+        profile / "agents" / "runtime-all-fields-example.md",
+        expected_root=profile / "agents",
+    )
+    assert agent.model == "vllm/Qwen3.6-35B-262k"
+    assert agent.approval_mode == "plan"
+    assert agent.color == "Purple"
+    assert agent.tools == ("read_file", "grep_search", "glob", "list_directory")
+    assert agent.disallowed_tools == ("write_file", "edit", "run_shell_command")
+
+    skill = load_skill_profile(
+        profile / "skills" / "runtime-all-fields-example" / "SKILL.md",
+        expected_root=profile / "skills",
+    )
+    assert skill.priority == 50
+    assert skill.paths == ("**/*.md", "**/*.yaml", "**/*.json")
+    assert skill.user_invocable is True
+    assert skill.disable_model_invocation is True
+
+    raw_config = safe_load((ROOT / "examples" / "config-all-fields.yaml").read_text())
+    assert isinstance(raw_config, dict)
+    assert set(raw_config) == {
+        "schema_version",
+        "runtime",
+        "gigacode",
+        "permissions",
+        "web",
+    }
+    assert set(raw_config["runtime"]) == {
+        "data_dir",
+        "max_parallel_agents",
+        "default_step_timeout_seconds",
+        "graceful_cancel_seconds",
+        "max_stdout_bytes_per_step",
+        "max_stderr_bytes_per_step",
+    }
+    assert set(raw_config["gigacode"]) == {
+        "executable",
+        "model_allowlist",
+        "environment_allowlist",
+    }
+    assert set(raw_config["permissions"]) == {
+        "default",
+        "allow_full_access",
+        "require_full_access_confirmation",
+        "max_parallel_full_access_agents",
+        "max_full_access_loop_iterations",
+        "trusted_scenario_hashes",
+    }
+    assert set(raw_config["web"]) == {
+        "enabled",
+        "host",
+        "port",
+        "open_automatically",
+    }
+    load_config(ROOT / "examples" / "config-all-fields.yaml", home=tmp_path / "home")
+
+    scenario = load_scenario_file(
+        profile / "scenarios" / "corporate-all-fields-example.yaml",
+        agent_catalog=AgentProfileCatalog(profile / "agents"),
+        skill_catalog=SkillProfileCatalog(profile / "skills"),
+    )
+    document = scenario.document
+    assert {definition["type"] for definition in document["inputs"].values()} == {
+        "string",
+        "integer",
+        "number",
+        "boolean",
+        "object",
+        "array",
+    }
+    assert {definition["permissions"] for definition in document["agents"].values()} == {
+        "read_only",
+        "propose_only",
+        "workspace_write",
+        "full_access",
+    }
+    assert any("agent_ref" in definition for definition in document["agents"].values())
+    assert any("system_prompt" in definition for definition in document["agents"].values())
+    assert any("system_prompt_file" in definition for definition in document["agents"].values())
+    inspect = document["steps"]["inspect"]
+    assert set(inspect["retry"]) == {"max_attempts", "backoff_seconds", "on"}
+    assert "context" in inspect["prompt"] and "when" in inspect
+    file_step = document["steps"]["file_backed_validation"]
+    assert "template_file" in file_step["prompt"]
+    assert isinstance(file_step["output_schema"], str)
+    loop = document["steps"]["bounded_review_loop"]
+    assert set(loop) == {
+        "kind",
+        "needs",
+        "max_iterations",
+        "timeout_seconds",
+        "on_limit",
+        "no_progress",
+        "body",
+        "until",
+    }
+    conditions_text = str((inspect["when"], loop["until"]))
+    assert all(f"'{operator}'" in conditions_text for operator in ("all", "any", "not"))
+
+    plan = compile_plan(
+        scenario,
+        load_config(profile / "config.yaml", home=tmp_path / "home"),
+        inputs={"task": "validate all fields"},
+        workspace=tmp_path,
+    )
+    assert plan.metadata.name == "corporate-all-fields-example"
+    assert plan.waves == (
+        ("inspect",),
+        ("file_backed_validation", "parallel_review"),
+        ("bounded_review_loop",),
+    )
+    assert plan.agents["gated_full_access"].allowed_tools == ("read_file",)
 
 
 def test_optional_simple_skills_scenario_is_ready_for_installed_text_skills(

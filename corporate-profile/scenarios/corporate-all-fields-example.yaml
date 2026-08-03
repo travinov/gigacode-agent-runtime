@@ -1,0 +1,268 @@
+schema_version: gigacode-agent-runtime/scenario-v1
+kind: Scenario
+
+metadata:
+  name: corporate-all-fields-example
+  title: TEST - all supported scenario fields
+  description: Safe reference object covering every scenario-v1 field and all three agent prompt sources.
+
+inputs:
+  task:
+    type: string
+    required: true
+    description: Primary text task used by the example.
+    default: Verify the complete Runtime example.
+  iteration_limit:
+    type: integer
+    required: false
+    description: Example integer input.
+    default: 2
+  quality_threshold:
+    type: number
+    required: false
+    description: Example number input.
+    default: 0.95
+  enabled:
+    type: boolean
+    required: false
+    description: Example boolean input.
+    default: true
+  metadata_object:
+    type: object
+    required: false
+    description: Example object input.
+    default:
+      source: runtime-all-fields-example
+      safe: true
+  review_tags:
+    type: array
+    required: false
+    description: Example array input.
+    default:
+      - documentation
+      - security
+
+max_parallel_agents: 4
+
+agents:
+  reusable_reviewer:
+    model: vllm/Qwen3.6-35B-262k
+    permissions: read_only
+    agent_ref: gigacode:runtime-all-fields-example
+    allowed_tools:
+      - read_file
+      - grep_search
+      - glob
+      - list_directory
+    skill_refs:
+      - gigacode:runtime-all-fields-example
+
+  inline_planner:
+    model: vllm/DeepSeek-V4-Flash-0731-262k
+    permissions: propose_only
+    system_prompt: |
+      You are the inline-prompt agent of the safe all-fields example.
+      Work only with supplied text and return JSON matching output_schema.
+    allowed_tools:
+      - read_file
+    skill_refs:
+      - gigacode:runtime-all-fields-example
+
+  file_worker:
+    model: vllm/MiniMax-M3-161k
+    permissions: workspace_write
+    system_prompt_file: corporate-all-fields-agent-system.md
+    allowed_tools:
+      - read_file
+      - glob
+    skill_refs:
+      - gigacode:runtime-all-fields-example
+
+  gated_full_access:
+    model: GigaChat-3.1-Ultra-128k
+    permissions: full_access
+    system_prompt: |
+      Demonstrate the full_access permission contract without modifying anything.
+      Use only the explicitly allowed read_file tool and return the required JSON.
+    allowed_tools:
+      - read_file
+    skill_refs:
+      - gigacode:runtime-all-fields-example
+
+steps:
+  inspect:
+    kind: agent
+    agent: reusable_reviewer
+    needs: []
+    prompt:
+      template: |
+        Inspect the supplied task without tools: ${inputs.task}
+      context:
+        source: all-fields-inline-prompt
+        tags: "${inputs.review_tags}"
+        metadata: "${inputs.metadata_object}"
+    output_schema:
+      type: object
+      required: [agent_example, skill_example, summary, approved]
+      properties:
+        agent_example:
+          const: RUNTIME_ALL_FIELDS_AGENT_OK
+        skill_example:
+          const: RUNTIME_ALL_FIELDS_SKILL_OK
+        summary:
+          type: string
+        approved:
+          type: boolean
+      additionalProperties: false
+    when:
+      all:
+        - ref: "${inputs.enabled}"
+          op: eq
+          value: true
+        - any:
+            - ref: "${inputs.review_tags}"
+              op: contains
+              value: documentation
+            - not:
+                ref: "${inputs.task}"
+                op: eq
+                value: ""
+    timeout_seconds: 300
+    retry:
+      max_attempts: 3
+      backoff_seconds: [0, 0.25]
+      on:
+        - process_error
+        - transient_cli_error
+        - invalid_output
+        - timeout
+
+  file_backed_validation:
+    kind: agent
+    agent: file_worker
+    needs: [inspect]
+    prompt:
+      template_file: corporate-all-fields-step-prompt.txt
+      context:
+        threshold: "${inputs.quality_threshold}"
+        iteration_limit: "${inputs.iteration_limit}"
+    output_schema: corporate-all-fields-output.schema
+    when:
+      ref: "${steps.inspect.output.summary}"
+      op: exists
+    timeout_seconds: 300
+    retry:
+      max_attempts: 2
+      backoff_seconds: [0.5]
+      on: [invalid_output]
+
+  parallel_review:
+    kind: agent
+    agent: inline_planner
+    needs: [inspect]
+    prompt:
+      template: "Summarize the review path for: ${inputs.task}"
+      context:
+        mode: parallel
+    output_schema:
+      type: object
+      required: [summary, approved]
+      properties:
+        summary:
+          type: string
+        approved:
+          type: boolean
+      additionalProperties: false
+    timeout_seconds: 300
+    retry:
+      max_attempts: 1
+      backoff_seconds: []
+      on: []
+
+  bounded_review_loop:
+    kind: loop
+    needs: [file_backed_validation, parallel_review]
+    max_iterations: 2
+    timeout_seconds: 900
+    on_limit: best_effort
+    no_progress:
+      max_unchanged_iterations: 1
+      fingerprint:
+        - "${loop.steps.review.output.summary}"
+        - "${loop.steps.review.output.score}"
+    body:
+      steps:
+        review:
+          kind: agent
+          agent: reusable_reviewer
+          needs: []
+          prompt:
+            template: |
+              Review iteration ${loop.iteration} for ${inputs.task}.
+            context:
+              previous: "${loop.previous.improve.output}"
+          output_schema:
+            type: object
+            required: [summary, approved, score]
+            properties:
+              summary:
+                type: string
+              approved:
+                type: boolean
+              score:
+                type: number
+            additionalProperties: false
+          timeout_seconds: 180
+          retry:
+            max_attempts: 2
+            backoff_seconds: [0]
+            on: [invalid_output, timeout]
+
+        improve:
+          kind: agent
+          agent: gated_full_access
+          needs: [review]
+          prompt:
+            template: |
+              Propose a text-only improvement from:
+              ${loop.steps.review.output.summary}
+            context:
+              iteration: "${loop.iteration}"
+          output_schema:
+            type: object
+            required: [candidate, changed]
+            properties:
+              candidate:
+                type: string
+              changed:
+                type: boolean
+            additionalProperties: false
+          when:
+            any:
+              - ref: "${loop.steps.review.output.approved}"
+                op: ne
+                value: true
+              - ref: "${loop.steps.review.output.score}"
+                op: lt
+                value: 0.95
+          timeout_seconds: 180
+          retry:
+            max_attempts: 1
+            backoff_seconds: []
+            on: []
+    until:
+      any:
+        - ref: "${loop.steps.review.output.approved}"
+          op: eq
+          value: true
+        - all:
+            - ref: "${loop.steps.review.output.score}"
+              op: gte
+              value: 0.95
+            - not:
+                ref: "${loop.steps.review.output.summary}"
+                op: contains
+                value: blocked
+
+result:
+  from: "${steps.bounded_review_loop.output}"

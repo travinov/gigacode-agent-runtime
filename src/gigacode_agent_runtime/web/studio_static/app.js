@@ -93,6 +93,8 @@ function fieldHelpKey(id) {
   if (/^route-step-\d+-kind$/.test(id)) return "scenario.step.kind";
   if (/^route-step-\d+-iterations$/.test(id)) return "scenario.loop.max_iterations";
   if (/^route-step-\d+-limit$/.test(id)) return "scenario.loop.on_limit";
+  if (/^route-step-\d+-no-progress-limit$/.test(id)) return "scenario.loop.no_progress_limit";
+  if (/^route-step-\d+-no-progress-fingerprint$/.test(id)) return "scenario.loop.no_progress_fingerprint";
   if (/^route-step-\d+-until-ref$/.test(id)) return "scenario.loop.until_ref";
   if (/^route-step-\d+-until-op$/.test(id)) return "scenario.loop.until_op";
   if (/^route-step-\d+-until-value$/.test(id)) return "scenario.loop.until_value";
@@ -101,7 +103,13 @@ function fieldHelpKey(id) {
   if (/^(?:route-step-\d+|nested-.+-\d+)-needs$/.test(id)) return "scenario.step.needs";
   if (/^(?:route-step-\d+|nested-.+-\d+)-timeout$/.test(id)) return "scenario.step.timeout_seconds";
   if (/^(?:route-step-\d+|nested-.+-\d+)-prompt$/.test(id)) return "scenario.step.prompt";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-prompt-file$/.test(id)) return "scenario.step.prompt_file";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-context$/.test(id)) return "scenario.step.context";
   if (/^(?:route-step-\d+|nested-.+-\d+)-schema$/.test(id)) return "scenario.step.output_schema";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-schema-file$/.test(id)) return "scenario.step.output_schema_file";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-retry-attempts$/.test(id)) return "scenario.step.retry_attempts";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-retry-backoff$/.test(id)) return "scenario.step.retry_backoff";
+  if (/^(?:route-step-\d+|nested-.+-\d+)-retry-on$/.test(id)) return "scenario.step.retry_on";
   if (/^(?:route-step-\d+|nested-.+-\d+)-when-ref$/.test(id)) return "scenario.condition.ref";
   if (/^(?:route-step-\d+|nested-.+-\d+)-when-op$/.test(id)) return "scenario.condition.op";
   if (/^(?:route-step-\d+|nested-.+-\d+)-when-value$/.test(id)) return "scenario.condition.value";
@@ -429,7 +437,8 @@ function renderConfig(document) {
 
 function renderAgent(document, writable) {
   const readOnly = writable ? "" : '<div class="read-only-banner">Источник доступен только для чтения.</div>';
-  return readOnly + section("Профиль агента", "Native Markdown agent с YAML front matter", `<div class="field-grid">${field("Имя", "agent-name", document.name, { disabled: !state.isNew })}${field("Описание", "agent-description", document.description || "")}${selectField("Модель", "agent-model", document.model || "", [{ value: "", label: "Без подсказки" }, ...state.catalog.choices.models])}${selectField("Approval mode", "agent-approval", document.approvalMode || "", [{ value: "", label: "По умолчанию" }, ...state.catalog.choices.approval_modes])}${field("Цвет", "agent-color", document.color || "")}${field("Разрешённые tools", "agent-tools", (document.tools || []).join("\n"), { type: "textarea", hint: "Один tool на строку" })}${field("Запрещённые tools", "agent-disallowed", (document.disallowedTools || []).join("\n"), { type: "textarea", hint: "Один tool на строку" })}${field("System prompt", "agent-prompt", document.system_prompt || "", { type: "textarea", wide: true, hint: "Тело .md; front matter сформирует Studio" })}</div>`);
+  const runtimeNote = '<div class="override-banner"><strong>Native и Runtime:</strong> model, approvalMode, tools и disallowedTools видны при прямом вызове агента в GigaCode. В Runtime сценарий всегда задаёт model и permissions явно; approvalMode, включая yolo, не наследуется. Если allowed_tools сценария не задан, Runtime использует tools профиля после вычитания disallowedTools.</div>';
+  return readOnly + runtimeNote + section("Профиль агента", "Native Markdown agent с YAML front matter", `<div class="field-grid">${field("Имя", "agent-name", document.name, { disabled: !state.isNew })}${field("Описание", "agent-description", document.description || "")}${selectField("Модель", "agent-model", document.model || "", [{ value: "", label: "Без подсказки" }, ...state.catalog.choices.models])}${selectField("Approval mode", "agent-approval", document.approvalMode || "", [{ value: "", label: "По умолчанию" }, ...state.catalog.choices.approval_modes])}${field("Цвет", "agent-color", document.color || "")}${field("Разрешённые tools", "agent-tools", (document.tools || []).join("\n"), { type: "textarea", hint: "Один точный tool ID на строку" })}${field("Запрещённые tools", "agent-disallowed", (document.disallowedTools || []).join("\n"), { type: "textarea", hint: "Один точный tool ID на строку; deny применяется после allow" })}${field("System prompt", "agent-prompt", document.system_prompt || "", { type: "textarea", wide: true, hint: "Тело .md; front matter сформирует Studio" })}</div>`);
 }
 
 function renderSkill(document, writable) {
@@ -461,12 +470,15 @@ function conditionFields(prefix, condition = {}) {
   const preserved = composite
     ? `<div class="override-banner">Составное условие all/any/not сохранится без изменений.</div>`
     : "";
-  return `<div data-original-condition="${escapeHtml(JSON.stringify(condition))}">${preserved}<div class="field-grid three">${field("Condition ref", `${prefix}-when-ref`, condition.ref || "")}${selectField("Operator", `${prefix}-when-op`, condition.op || "eq", ["eq", "ne", "lt", "lte", "gt", "gte", "contains", "exists"])}${field("Value (JSON)", `${prefix}-when-value`, condition.value === undefined ? "" : JSON.stringify(condition.value))}</div></div>`;
+  return `<div data-original-condition="${escapeHtml(JSON.stringify(condition))}">${preserved}<div class="field-grid three">${field("Condition ref", `${prefix}-ref`, condition.ref || "")}${selectField("Operator", `${prefix}-op`, condition.op || "eq", ["eq", "ne", "lt", "lte", "gt", "gte", "contains", "exists"])}${field("Value (JSON)", `${prefix}-value`, condition.value === undefined ? "" : JSON.stringify(condition.value))}</div></div>`;
 }
 
 function renderAgentStepFields(step, prefix, agentNames) {
-  const schema = JSON.stringify(step.output_schema || { type: "object" }, null, 2);
-  return `<div class="field-grid three">${selectField("Agent", `${prefix}-agent`, step.agent || agentNames[0] || "", agentNames)}${field("Needs", `${prefix}-needs`, (step.needs || []).join(", "), { hint: "ID шагов через запятую" })}${field("Timeout, сек.", `${prefix}-timeout`, step.timeout_seconds || "", { type: "number", min: 1 })}${field("Prompt template", `${prefix}-prompt`, step.prompt?.template || "", { type: "textarea", wide: true })}${field("Output schema (JSON)", `${prefix}-schema`, schema, { type: "textarea", wide: true })}</div><div class="nested-body"><h4>Необязательное условие when</h4>${conditionFields(prefix, step.when || {})}</div>`;
+  const schemaFile = typeof step.output_schema === "string" ? step.output_schema : "";
+  const schema = JSON.stringify(schemaFile ? { type: "object" } : (step.output_schema || { type: "object" }), null, 2);
+  const context = JSON.stringify(step.prompt?.context || {}, null, 2);
+  const retry = step.retry || {};
+  return `<div class="field-grid three">${selectField("Agent", `${prefix}-agent`, step.agent || agentNames[0] || "", agentNames)}${field("Needs", `${prefix}-needs`, (step.needs || []).join(", "), { hint: "ID шагов через запятую" })}${field("Timeout, сек.", `${prefix}-timeout`, step.timeout_seconds || "", { type: "number", min: 1 })}${field("Prompt template file", `${prefix}-prompt-file`, step.prompt?.template_file || "", { wide: true, hint: "Если заполнено, inline template не используется" })}${field("Prompt template", `${prefix}-prompt`, step.prompt?.template || "", { type: "textarea", wide: true, hint: "Обязателен, если template file пуст" })}${field("Prompt context (JSON)", `${prefix}-context`, context, { type: "textarea", wide: true })}${field("Output schema file", `${prefix}-schema-file`, schemaFile, { wide: true, hint: "JSON-файл; если заполнено, inline schema не используется" })}${field("Output schema (JSON)", `${prefix}-schema`, schema, { type: "textarea", wide: true })}</div><div class="nested-body"><h4>Retry</h4><div class="field-grid three">${field("Max attempts", `${prefix}-retry-attempts`, retry.max_attempts ?? "", { type: "number", min: 1, max: 20 })}${field("Backoff, сек.", `${prefix}-retry-backoff`, (retry.backoff_seconds || []).join(", "), { hint: "До 19 чисел через запятую" })}${field("Retry on", `${prefix}-retry-on`, (retry.on || []).join(", "), { hint: "process_error, transient_cli_error, invalid_output, timeout" })}</div></div><div class="nested-body"><h4>Необязательное условие when</h4>${conditionFields(`${prefix}-when`, step.when || {})}</div>`;
 }
 
 function renderNestedStep(name, step, index, parent, agentNames) {
@@ -479,7 +491,7 @@ function renderStepCard(name, step, index, agentNames) {
   let body;
   if (step.kind === "loop") {
     const nested = Object.entries(step.body?.steps || {}).map(([nestedName, nestedStep], nestedIndex) => renderNestedStep(nestedName, nestedStep, nestedIndex, name, agentNames)).join("");
-    body = `<div class="field-grid three">${field("Needs", `${prefix}-needs`, (step.needs || []).join(", "))}${field("Max iterations", `${prefix}-iterations`, step.max_iterations || 1, { type: "number", min: 1 })}${field("Timeout, сек.", `${prefix}-timeout`, step.timeout_seconds || 900, { type: "number", min: 1 })}${selectField("On limit", `${prefix}-limit`, step.on_limit || "fail", ["fail", "pause", "best_effort"])}${field("Until ref", `${prefix}-until-ref`, step.until?.ref || "${loop.steps.work.output.approved}")}${selectField("Until op", `${prefix}-until-op`, step.until?.op || "eq", ["eq", "ne", "lt", "lte", "gt", "gte", "contains", "exists"])}${field("Until value (JSON)", `${prefix}-until-value`, JSON.stringify(step.until?.value ?? true))}</div><div class="nested-body"><h4>Шаги одной итерации</h4><div class="repeat-list nested-list">${nested}</div><button type="button" class="add-button add-nested" data-parent="${escapeHtml(name)}">+ Добавить шаг в loop</button></div>`;
+    body = `<div class="field-grid three">${field("Needs", `${prefix}-needs`, (step.needs || []).join(", "))}${field("Max iterations", `${prefix}-iterations`, step.max_iterations || 1, { type: "number", min: 1 })}${field("Timeout, сек.", `${prefix}-timeout`, step.timeout_seconds || 900, { type: "number", min: 1 })}${selectField("On limit", `${prefix}-limit`, step.on_limit || "fail", ["fail", "pause", "best_effort"])}${field("No progress iterations", `${prefix}-no-progress-limit`, step.no_progress?.max_unchanged_iterations || "", { type: "number", min: 1 })}${field("No progress fingerprint", `${prefix}-no-progress-fingerprint`, (step.no_progress?.fingerprint || []).join("\n"), { type: "textarea", wide: true, hint: "Одно выражение на строку" })}</div><div class="nested-body"><h4>Условие until</h4>${conditionFields(`${prefix}-until`, step.until || {})}</div><div class="nested-body"><h4>Шаги одной итерации</h4><div class="repeat-list nested-list">${nested}</div><button type="button" class="add-button add-nested" data-parent="${escapeHtml(name)}">+ Добавить шаг в loop</button></div>`;
   } else {
     body = renderAgentStepFields(step, prefix, agentNames);
   }
@@ -550,6 +562,13 @@ function parseSchema(value, label) {
   }
 }
 
+function parseOptionalObject(value, label) {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = parseSchema(trimmed, label);
+  return Object.keys(parsed).length ? parsed : undefined;
+}
+
 function collectConfig() {
   const trusted = {};
   $$(".trust-row").forEach((row) => {
@@ -615,7 +634,7 @@ function collectSkill() {
 }
 
 function collectCondition(prefix) {
-  const input = $(`#${prefix}-when-ref`);
+  const input = $(`#${prefix}-ref`);
   const ref = input?.value.trim();
   if (!ref) {
     const raw = input?.closest("[data-original-condition]")?.dataset.originalCondition;
@@ -627,27 +646,44 @@ function collectCondition(prefix) {
   }
   return {
     ref,
-    op: $(`#${prefix}-when-op`).value,
-    value: parseFlexible($(`#${prefix}-when-value`).value),
+    op: $(`#${prefix}-op`).value,
+    value: parseFlexible($(`#${prefix}-value`).value),
   };
 }
 
 function collectAgentStep(card, prefix, original = {}) {
+  const prompt = { ...(original.prompt || {}) };
+  const promptFile = $(`#${prefix}-prompt-file`).value.trim();
+  delete prompt.template;
+  delete prompt.template_file;
+  if (promptFile) prompt.template_file = promptFile;
+  else prompt.template = $(`#${prefix}-prompt`).value;
+  const context = parseOptionalObject($(`#${prefix}-context`).value, "Prompt context");
+  if (context) prompt.context = context;
+  else delete prompt.context;
+  const schemaFile = $(`#${prefix}-schema-file`).value.trim();
   const step = {
     ...clone(original),
     kind: "agent",
     agent: $(`#${prefix}-agent`).value,
     needs: commaList($(`#${prefix}-needs`).value),
-    prompt: {
-      ...(original.prompt || {}),
-      template: $(`#${prefix}-prompt`).value,
-    },
-    output_schema: parseSchema($(`#${prefix}-schema`).value, "Output schema"),
+    prompt,
+    output_schema: schemaFile || parseSchema($(`#${prefix}-schema`).value, "Output schema"),
   };
   const timeout = numberValue(`#${prefix}-timeout`);
   if (timeout !== undefined) step.timeout_seconds = timeout;
   else delete step.timeout_seconds;
-  const when = collectCondition(prefix);
+  const retryAttempts = numberValue(`#${prefix}-retry-attempts`);
+  const retryBackoff = commaList($(`#${prefix}-retry-backoff`).value).map(Number);
+  const retryOn = commaList($(`#${prefix}-retry-on`).value);
+  if (retryAttempts !== undefined || retryBackoff.length || retryOn.length) {
+    step.retry = {
+      max_attempts: retryAttempts ?? 1,
+      backoff_seconds: retryBackoff,
+      on: retryOn,
+    };
+  } else delete step.retry;
+  const when = collectCondition(`${prefix}-when`);
   if (when) step.when = when;
   else delete step.when;
   return step;
@@ -717,7 +753,7 @@ function collectScenario() {
         originalNested,
       );
     });
-    steps[name] = {
+    const loop = {
       ...original,
       kind: "loop",
       needs: commaList($(`#${prefix}-needs`).value),
@@ -725,12 +761,17 @@ function collectScenario() {
       timeout_seconds: numberValue(`#${prefix}-timeout`, 900),
       on_limit: $(`#${prefix}-limit`).value,
       body: { ...(original.body || {}), steps: nestedSteps },
-      until: {
-        ref: $(`#${prefix}-until-ref`).value,
-        op: $(`#${prefix}-until-op`).value,
-        value: parseFlexible($(`#${prefix}-until-value`).value),
-      },
+      until: collectCondition(`${prefix}-until`) || original.until,
     };
+    const noProgressLimit = numberValue(`#${prefix}-no-progress-limit`);
+    const fingerprint = lines($(`#${prefix}-no-progress-fingerprint`).value);
+    if (noProgressLimit !== undefined || fingerprint.length) {
+      loop.no_progress = {
+        max_unchanged_iterations: noProgressLimit ?? 1,
+        fingerprint,
+      };
+    } else delete loop.no_progress;
+    steps[name] = loop;
   });
 
   const document = {

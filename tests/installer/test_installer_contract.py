@@ -80,8 +80,10 @@ def test_failure_injection_rolls_back_every_stage(
     assert not list((data_dir / "scenarios").glob("corporate-*.yaml"))
     agents_dir = Path(environment["HOME"]) / ".gigacode" / "agents"
     assert not (agents_dir / "business-analyst-proactive.md").exists()
+    assert not (agents_dir / "runtime-all-fields-example.md").exists()
     skills_dir = Path(environment["HOME"]) / ".gigacode" / "skills"
     assert not (skills_dir / "runtime-skill-probe" / "SKILL.md").exists()
+    assert not (skills_dir / "runtime-all-fields-example" / "SKILL.md").exists()
     commands_dir = Path(environment["HOME"]) / ".gigacode" / "commands"
     assert not (commands_dir / "open_studio.md").exists()
     assert not (data_dir / ".open-studio-command.sha256").exists()
@@ -122,11 +124,20 @@ def test_install_keeps_venv_at_created_path_and_is_idempotent(
         "corporate-sequential.yaml",
         "corporate-agent-ref.yaml",
         "corporate-skill-ref.yaml",
+        "corporate-all-fields-example.yaml",
     }
+    for resource in (
+        "corporate-all-fields-agent-system.md",
+        "corporate-all-fields-step-prompt.txt",
+        "corporate-all-fields-output.schema",
+    ):
+        assert (data_dir / "scenarios" / resource).is_file()
     agents_dir = Path(environment["HOME"]) / ".gigacode" / "agents"
     assert (agents_dir / "business-analyst-proactive.md").is_file()
+    assert (agents_dir / "runtime-all-fields-example.md").is_file()
     skills_dir = Path(environment["HOME"]) / ".gigacode" / "skills"
     assert (skills_dir / "runtime-skill-probe" / "SKILL.md").is_file()
+    assert (skills_dir / "runtime-all-fields-example" / "SKILL.md").is_file()
     command = Path(environment["HOME"]) / ".gigacode" / "commands" / (
         "open_studio.md"
     )

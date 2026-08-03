@@ -50,12 +50,19 @@ def test_studio_assets_are_offline_and_cover_structured_editors() -> None:
     assert "Создание сценариев" in help_javascript
     assert "Создание агентов" in help_javascript
     assert "Создание и назначение Skills" in help_javascript
+    assert "Полные тестовые примеры" in help_javascript
     assert "best_effort" in help_javascript
     assert "1024\N{EN DASH}65535" in help_javascript
     assert help_javascript.count('topic: "') >= 50
     assert '["fail", "pause", "best_effort"]' in javascript
     assert "min: 1024" in javascript
     assert 'checkField("Открывать автоматически"' in javascript
+    assert "retry-attempts" in javascript
+    assert "retry-backoff" in javascript
+    assert "prompt-file" in javascript
+    assert "schema-file" in javascript
+    assert "no-progress-fingerprint" in javascript
+    assert "approvalMode, включая yolo, не наследуется" in javascript
     help_keys = set(
         re.findall(
             r'^    "([a-z]+(?:\.[a-z_]+)+)": \{$',

@@ -63,8 +63,15 @@ MCP tool `open_studio` только создаёт authenticated URL и сам �
 Skill, permission или approval-mode значения из каталога Studio.
 
 Маршрут собирается структурированно: inputs, agents, model/permission/Skill
-справочники, `needs`, prompts, output schemas, agent steps, loop body, `until` и
-result. Built-in routes и extension/bundled Skills помечаются как read-only.
+справочники, `needs`, inline/file prompts, prompt context, inline/file output
+schemas, retry, agent steps, loop body, no-progress guard, `until` и result.
+Built-in routes и extension/bundled Skills помечаются как read-only.
+
+Installer добавляет `runtime-all-fields-example` Agent и Skill, а также
+`corporate-all-fields-example` route. Эти объекты заполняют все поддерживаемые
+поля и описаны в теме `Полные тестовые примеры`. Native agent
+`approvalMode: yolo` не является Runtime permission: Runtime использует
+явные `permissions` сценария и собственный full-access approval gate.
 
 Каждая запись проходит две явные стадии:
 

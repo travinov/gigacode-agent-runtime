@@ -388,6 +388,14 @@ run продолжает использовать снимок даже посл
 исходный allowlist только когда сценарий не задал собственный `allowed_tools`.
 Явный список сценария имеет приоритет.
 
+Agent, созданный через Configuration Studio, записывается в
+`~/.gigacode/agents/<name>.md`. После перезапуска GigaCode он должен появиться
+в нативном каталоге агентов и в `/agents manage`. Поля `model`,
+`approvalMode`, `tools` и `disallowedTools` относятся к прямому нативному
+вызову. При выполнении через Runtime сценарий явно задаёт `model`,
+`permissions` и при необходимости `allowed_tools`; `approvalMode` профиля не
+наследуется.
+
 ### Явное назначение Skills агенту
 
 ```yaml
@@ -685,6 +693,12 @@ inputs:
 | `propose_only` | Подготовка текста или структурированного предложения без применения изменений; используется тот же изолированный режим `default`. |
 | `workspace_write` | Разрешены изменения внутри workspace; GigaCode запускается в auto-edit с sandbox. |
 | `full_access` | Расширенный auto-edit режим. Требует глобального разрешения и, как правило, подтверждения точного `plan_hash`. |
+
+`yolo` не является режимом `permissions` Runtime. Studio позволяет записать
+`approvalMode: yolo` в native agent profile, потому что это допустимое metadata
+GigaCode для прямого запуска такого агента. Runtime игнорирует это поле:
+`full_access` использует `auto-edit`, явный tool allowlist, глобальный
+`allow_full_access` и отдельный approval gate по точному `plan_hash`.
 
 В v1 `read_only` и `propose_only` используют одинаковый технический профиль,
 но сохраняются как разные намерения сценария. Нативный `approval-mode plan` не
@@ -1353,6 +1367,33 @@ Built-in сценарии и extension/bundled Skills доступны толь�
 Созданный user Skill может явно перекрыть одноимённый extension/bundled source.
 После изменения config переподключите GigaCode/MCP; остальные сохранённые
 ресурсы доступны новым планам после обновления каталога.
+
+Agent или Skill, созданный через Studio, сразу появляется в каталоге Runtime.
+Для обновления нативных каталогов и slash commands самого GigaCode перезапустите
+GigaCode: agent будет прочитан из `~/.gigacode/agents`, Skill — из
+`~/.gigacode/skills`.
+
+### Полные устанавливаемые примеры
+
+Installer добавляет безопасный справочный набор без копирования и ручного
+редактирования:
+
+```text
+~/.gigacode/agents/runtime-all-fields-example.md
+~/.gigacode/skills/runtime-all-fields-example/SKILL.md
+~/.gigacode/agent-runtime/scenarios/corporate-all-fields-example.yaml
+```
+
+В разделе `Описание → Полные тестовые примеры` указано, где смотреть каждое
+поле. Agent содержит все native metadata, включая `tools` и
+`disallowedTools`; Skill — все invocation metadata; Scenario — все типы inputs,
+три источника system prompt, четыре Runtime permissions, inline/file prompts и
+schemas, context, retry, conditions, loop/no-progress и result. Отдельный
+schema-valid Config reference находится в `examples/config-all-fields.yaml`.
+
+Сценарий намеренно содержит `workspace_write` и `full_access` только для
+демонстрации контракта. Перед запуском изучите Preview; full access не начнётся
+без штатных gates конфигурации и подтверждения.
 
 ## Мониторинг и продолжение запуска
 

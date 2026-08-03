@@ -160,6 +160,20 @@ seed_corporate_profile() {
       "$GAR_DATA_DIR/scenarios/$(basename "$SOURCE_SCENARIO")"
   done
   [ "$SCENARIO_COUNT" -gt 0 ] || gar_die "corporate scenario profile is empty"
+  SCENARIO_RESOURCE_COUNT=0
+  for SOURCE_RESOURCE in \
+    "$PROFILE_ROOT/scenarios/"*.md \
+    "$PROFILE_ROOT/scenarios/"*.txt \
+    "$PROFILE_ROOT/scenarios/"*.schema
+  do
+    [ -f "$SOURCE_RESOURCE" ] || continue
+    SCENARIO_RESOURCE_COUNT=$((SCENARIO_RESOURCE_COUNT + 1))
+    seed_file_if_missing \
+      "$SOURCE_RESOURCE" \
+      "$GAR_DATA_DIR/scenarios/$(basename "$SOURCE_RESOURCE")"
+  done
+  [ "$SCENARIO_RESOURCE_COUNT" -gt 0 ] || \
+    gar_die "corporate scenario resources are empty"
   AGENT_COUNT=0
   for SOURCE_AGENT in "$PROFILE_ROOT/agents/"*.md; do
     [ -f "$SOURCE_AGENT" ] || continue

@@ -72,7 +72,9 @@ Installer должен уже положить конфигурацию и го�
 test -f "$HOME/.gigacode/agent-runtime/config.yaml"
 ls "$HOME/.gigacode/agent-runtime/scenarios"/corporate-*.yaml
 test -f "$HOME/.gigacode/agents/business-analyst-proactive.md"
+test -f "$HOME/.gigacode/agents/runtime-all-fields-example.md"
 test -f "$HOME/.gigacode/skills/runtime-skill-probe/SKILL.md"
+test -f "$HOME/.gigacode/skills/runtime-all-fields-example/SKILL.md"
 test -f "$HOME/.gigacode/commands/open_studio.md"
 agent-runtime agents list --json
 agent-runtime skills list --json
@@ -95,6 +97,8 @@ agent-runtime scenario validate \
 agent-runtime scenario validate \
   "$HOME/.gigacode/agent-runtime/scenarios/corporate-skill-ref.yaml" --json
 agent-runtime scenario validate \
+  "$HOME/.gigacode/agent-runtime/scenarios/corporate-all-fields-example.yaml" --json
+agent-runtime scenario validate \
   "$HOME/.gigacode/agent-runtime/scenarios/corporate-simple-skills.yaml" --json
 ```
 
@@ -115,9 +119,10 @@ agent-runtime scenario validate \
 
 Проверьте, что GigaCode обнаружил custom command, вызвал MCP tool
 `open_studio`, а браузер открыл URL на `127.0.0.1`. В Studio должны быть видны
-settings, шесть базовых `corporate-*` routes, условный
-`corporate-simple-skills`, `business-analyst-proactive` и фактический
-объединённый Skill catalog. Измените безвредное поле, откройте Preview,
+settings, семь базовых `corporate-*` routes, условный
+`corporate-simple-skills`, оба установленных agents и оба установленных user
+Skills. Откройте `corporate-all-fields-example` и проверьте retry, внешние
+prompt/schema, no-progress и составные conditions. Затем измените безвредное поле, откройте Preview,
 зафиксируйте validation/waves/diff и нажмите «Отмена», не применяя изменение.
 
 Отдельно проверьте terminal fallback:

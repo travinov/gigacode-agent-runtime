@@ -168,7 +168,7 @@ window.STUDIO_HELP = Object.freeze({
     },
     "agent.approval_mode": {
       title: "Approval mode агента",
-      description: "Native GigaCode metadata профиля. Runtime дополнительно применяет собственный permission contract сценария.",
+      description: "Native GigaCode metadata для прямого вызова профиля. Runtime не наследует это поле и использует permissions сценария; поэтому yolo здесь не включает YOLO в Runtime.",
       allowed: "Пусто, default, plan, auto-edit, yolo или bubble.",
       example: "plan",
       topic: "agents",
@@ -427,11 +427,53 @@ window.STUDIO_HELP = Object.freeze({
       example: "Проверь результат: ${steps.draft.output}",
       topic: "execution",
     },
+    "scenario.step.prompt_file": {
+      title: "Prompt template file",
+      description: "Внешний UTF-8 шаблон prompt относительно каталога сценария или workspace. Выберите его вместо inline template.",
+      allowed: "Пусто либо непустой безопасный локальный путь. Нельзя одновременно задавать template и template_file.",
+      example: "review-prompt.txt",
+      topic: "execution",
+    },
+    "scenario.step.context": {
+      title: "Prompt context",
+      description: "Дополнительный JSON object с именованными данными для шаблона и фиксации в ExecutionPlan.",
+      allowed: "Пустой либо валидный JSON object. Массив и скаляр на верхнем уровне запрещены.",
+      example: "{\n  \"mode\": \"strict\",\n  \"threshold\": 0.95\n}",
+      topic: "execution",
+    },
     "scenario.step.output_schema": {
       title: "Output schema",
       description: "JSON Schema структурированного ответа. Runtime не примет результат модели, пока он не соответствует этой схеме.",
-      allowed: "JSON object, описывающий ожидаемый результат. В форме Studio путь к внешней schema не вводится.",
+      allowed: "JSON object, описывающий ожидаемый результат. Используется, если поле внешнего schema file пусто.",
       example: "{\n  \"type\": \"object\",\n  \"required\": [\"approved\"],\n  \"properties\": {\"approved\": {\"type\": \"boolean\"}}\n}",
+      topic: "execution",
+    },
+    "scenario.step.output_schema_file": {
+      title: "Output schema file",
+      description: "Внешний файл с JSON Schema относительно каталога сценария или workspace.",
+      allowed: "Пусто либо безопасный путь к UTF-8 файлу, содержащему один JSON object. Нельзя одновременно использовать inline schema.",
+      example: "review-output.schema",
+      topic: "execution",
+    },
+    "scenario.step.retry_attempts": {
+      title: "Retry max attempts",
+      description: "Общее число попыток agent step, включая первую. Повторы выполняются только для причин из Retry on.",
+      allowed: "Пусто для отсутствия retry либо целое число 1–20.",
+      example: "3",
+      topic: "execution",
+    },
+    "scenario.step.retry_backoff": {
+      title: "Retry backoff",
+      description: "Задержки перед повторными попытками в секундах, последовательно по номеру retry.",
+      allowed: "До 19 неотрицательных чисел через запятую.",
+      example: "0, 0.5, 2",
+      topic: "execution",
+    },
+    "scenario.step.retry_on": {
+      title: "Retry on",
+      description: "Классы ошибок, при которых Runtime разрешает повтор шага.",
+      allowed: "Уникальные значения: process_error, transient_cli_error, invalid_output, timeout.",
+      example: "transient_cli_error, invalid_output, timeout",
       topic: "execution",
     },
     "scenario.condition.ref": {
@@ -467,6 +509,20 @@ window.STUDIO_HELP = Object.freeze({
       description: "Действие, если until не выполнено до достижения предела.",
       allowed: "fail — завершить ошибкой; pause — ждать решения оператора; best_effort — вернуть лучший накопленный результат.",
       example: "pause",
+      topic: "loops",
+    },
+    "scenario.loop.no_progress_limit": {
+      title: "No progress iterations",
+      description: "Останавливает loop, если fingerprint результата не меняется указанное число итераций.",
+      allowed: "Пусто для отключения либо целое число от 1. При заполнении требуется fingerprint.",
+      example: "2",
+      topic: "loops",
+    },
+    "scenario.loop.no_progress_fingerprint": {
+      title: "No progress fingerprint",
+      description: "Набор выражений, по значениям которых Runtime определяет отсутствие прогресса между итерациями.",
+      allowed: "Одно или несколько непустых выражений, по одному на строку.",
+      example: "${loop.steps.review.output.feedback}",
       topic: "loops",
     },
     "scenario.loop.until_ref": {
@@ -521,6 +577,25 @@ window.STUDIO_HELP = Object.freeze({
       ],
     },
     {
+      id: "examples",
+      title: "Полные тестовые примеры",
+      description: "Устанавливаемые безопасные объекты, в которых заполнены все поддерживаемые поля Config, Agent, Skill и Scenario.",
+      steps: [
+        ["Откройте Config", "Активный corporate config содержит все поля рабочей конфигурации. Отдельный schema-valid reference находится в examples/config-all-fields.yaml и включает пример trusted hash."],
+        ["Откройте Agent", "Выберите runtime-all-fields-example. В нём заполнены name, description, model, approvalMode, color, tools, disallowedTools и system prompt."],
+        ["Откройте Skill", "Выберите runtime-all-fields-example. В нём заполнены priority, paths, user-invocable, disable-model-invocation и инструкции."],
+        ["Откройте Scenario", "Выберите corporate-all-fields-example. Он показывает шесть типов inputs, три источника agent prompt, четыре permission mode, prompt/context/schema files, retry, составные conditions, loop/no_progress и result."],
+        ["Не запускайте без Preview", "Пример безопасен по prompt и tool allowlist, но намеренно содержит workspace_write и full_access для демонстрации. Full access должен пройти штатный approval gate."],
+      ],
+      sections: [
+        {
+          title: "Видимость в GigaCode",
+          paragraphs: ["Installer сохраняет пример агента в ~/.gigacode/agents и пример Skill в ~/.gigacode/skills. После перезапуска GigaCode они должны появиться в нативных каталогах; сценарий виден через Agent Runtime."],
+          bullets: ["Native approvalMode: yolo относится только к прямому вызову GigaCode agent.", "Runtime не наследует yolo и использует permissions сценария.", "Точные tool ID зависят от сборки GigaCode; пример использует официальные Qwen Code IDs."],
+        },
+      ],
+    },
+    {
       id: "runtime",
       title: "Настройки Runtime",
       description: "GigaCode CLI, лимиты исполнения, каталоги состояния и локальный Web UI.",
@@ -546,6 +621,7 @@ window.STUDIO_HELP = Object.freeze({
         ["Опишите назначение", "Description должно отвечать на вопрос «когда выбирать этого агента», а system prompt — «как именно он работает»."],
         ["Ограничьте инструменты", "Не добавляйте tools «на всякий случай». Denylist используйте для явного запрета опасных действий."],
         ["Выполните Preview и Apply", "Studio сформирует YAML front matter и Markdown body, затем проверит профиль тем же parser, который использует Runtime."],
+        ["Перезапустите GigaCode", "User profile сохраняется в ~/.gigacode/agents/<name>.md. После перезапуска он должен появиться в native agent catalog и /agents manage."],
         ["Подключите к маршруту", "В Agents сценария выберите Reusable agent. Model и permissions укажите явно: профиль не подменяет контракт исполнения."],
       ],
       fieldGroups: [
@@ -556,6 +632,10 @@ window.STUDIO_HELP = Object.freeze({
         {
           title: "Три источника system prompt",
           paragraphs: ["Для агента сценария выбирается ровно один источник: reusable agent_ref, system_prompt_file или inline system_prompt. Одновременное заполнение нескольких источников отклоняется схемой."],
+        },
+        {
+          title: "YOLO и Runtime",
+          paragraphs: ["approvalMode профиля управляет нативным subagent при прямом вызове из GigaCode. Runtime игнорирует это metadata и запускает дочерний CLI по permissions сценария. full_access — не YOLO: он использует auto-edit, явный allowed_tools и отдельный approval gate Runtime."],
         },
       ],
     },
@@ -568,6 +648,7 @@ window.STUDIO_HELP = Object.freeze({
         ["Заполните metadata", "Имя и description обязательны. Paths, priority и invocation flags добавляйте только если они действительно нужны."],
         ["Напишите проверяемые инструкции", "Укажите входы, порядок действий, ограничения, проверки качества и формат результата."],
         ["Сохраните user Skill", "Studio создаст ~/.gigacode/skills/<name>/SKILL.md. Extension и bundled источники доступны только для чтения; для изменения создайте user override."],
+        ["Перезапустите GigaCode", "После сохранения user Skill перезапустите GigaCode, чтобы его native catalog и slash commands перечитали ~/.gigacode/skills."],
         ["Назначьте Skill агенту", "В сценарии выберите Skills у конкретного alias. Пустой список не наследует весь пользовательский каталог."],
       ],
       fieldGroups: [
@@ -603,7 +684,7 @@ window.STUDIO_HELP = Object.freeze({
       sections: [
         {
           title: "Schema v1 и расширенные поля",
-          paragraphs: ["Неизвестные поля запрещены. Studio структурированно редактирует основные v1 поля. Существующие retry, no_progress и составные условия all/any/not сохраняются при редактировании, но пока не создаются отдельными контролами формы."],
+          paragraphs: ["Неизвестные поля запрещены. Studio редактирует retry, no_progress, prompt context, внешние prompt/schema files и простые conditions. Составные условия all/any/not отображаются как read-preserve блок и сохраняются без изменения."],
         },
       ],
     },
@@ -618,7 +699,7 @@ window.STUDIO_HELP = Object.freeze({
         ["Условный шаг", "when проверяется после завершения needs. Если условие ложно, шаг пропускается по контракту Runtime."],
       ],
       fieldGroups: [
-        ["Поля DAG", ["scenario.step.name", "scenario.step.kind", "scenario.step.agent", "scenario.step.needs", "scenario.step.timeout_seconds", "scenario.step.prompt", "scenario.step.output_schema", "scenario.condition.ref", "scenario.condition.op", "scenario.condition.value", "scenario.result"]],
+        ["Поля DAG", ["scenario.step.name", "scenario.step.kind", "scenario.step.agent", "scenario.step.needs", "scenario.step.timeout_seconds", "scenario.step.prompt", "scenario.step.prompt_file", "scenario.step.context", "scenario.step.output_schema", "scenario.step.output_schema_file", "scenario.step.retry_attempts", "scenario.step.retry_backoff", "scenario.step.retry_on", "scenario.condition.ref", "scenario.condition.op", "scenario.condition.value", "scenario.result"]],
       ],
       sections: [
         {
@@ -640,7 +721,7 @@ window.STUDIO_HELP = Object.freeze({
         ["Проверьте schema outputs", "Поля, на которые ссылается until, должны присутствовать в output_schema соответствующего nested step."],
       ],
       fieldGroups: [
-        ["Поля loop", ["scenario.step.needs", "scenario.loop.max_iterations", "scenario.step.timeout_seconds", "scenario.loop.on_limit", "scenario.loop.until_ref", "scenario.loop.until_op", "scenario.loop.until_value"]],
+        ["Поля loop", ["scenario.step.needs", "scenario.loop.max_iterations", "scenario.step.timeout_seconds", "scenario.loop.on_limit", "scenario.loop.no_progress_limit", "scenario.loop.no_progress_fingerprint", "scenario.loop.until_ref", "scenario.loop.until_op", "scenario.loop.until_value"]],
       ],
       sections: [
         {

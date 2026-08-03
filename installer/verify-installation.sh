@@ -10,8 +10,12 @@ SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
   gar_die "corporate runtime configuration is missing"
 [ -f "$GAR_AGENTS_DIR/business-analyst-proactive.md" ] || \
   gar_die "reusable GigaCode agent profile is missing"
+[ -f "$GAR_AGENTS_DIR/runtime-all-fields-example.md" ] || \
+  gar_die "all-fields GigaCode agent example is missing"
 [ -f "$GAR_SKILLS_DIR/runtime-skill-probe/SKILL.md" ] || \
   gar_die "GigaCode Skill probe is missing"
+[ -f "$GAR_SKILLS_DIR/runtime-all-fields-example/SKILL.md" ] || \
+  gar_die "all-fields GigaCode Skill example is missing"
 [ -f "$GAR_STUDIO_COMMAND" ] || \
   gar_die "GigaCode /open_studio command is missing"
 for SCENARIO_NAME in \
@@ -20,10 +24,19 @@ for SCENARIO_NAME in \
   corporate-mixed \
   corporate-review-repair-loop \
   corporate-agent-ref \
-  corporate-skill-ref
+  corporate-skill-ref \
+  corporate-all-fields-example
 do
   [ -f "$GAR_DATA_DIR/scenarios/$SCENARIO_NAME.yaml" ] || \
     gar_die "corporate scenario is missing: $SCENARIO_NAME"
+done
+for RESOURCE in \
+  corporate-all-fields-agent-system.md \
+  corporate-all-fields-step-prompt.txt \
+  corporate-all-fields-output.schema
+do
+  [ -f "$GAR_DATA_DIR/scenarios/$RESOURCE" ] || \
+    gar_die "all-fields scenario resource is missing: $RESOURCE"
 done
 GIGACODE=$(gar_find_gigacode)
 

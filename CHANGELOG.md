@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.0-rc.18] - 2026-08-03
+
+### Added
+
+- Install complete safe examples for Config, reusable Agent, Skill, and
+  Scenario objects with every supported field populated.
+- Demonstrate native agent `tools` and `disallowedTools`, all Runtime
+  permission values, every input type, all prompt sources, retry, external
+  prompt/schema resources, composite conditions, and loop no-progress guards.
+- Add Studio controls and help for retry, prompt context, external prompt/schema
+  files, and no-progress fingerprints.
+
+### Changed
+
+- Explain in Studio and documentation that native agent `approvalMode: yolo`
+  applies to direct GigaCode subagent invocation but is not inherited by Runtime
+  scenarios, which use their own permission and approval contract.
+
 ## [1.0.0-rc.17] - 2026-08-03
 
 ### Added
